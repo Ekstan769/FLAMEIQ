@@ -1,0 +1,16 @@
+.DS_Store
+node_modules/
+/.vscode
+/.idea
+dist/
+build/
+npm-debug.log*
+pnpm-debug.log*
+
+# dotenv environment files
+.env
+.env.*
+
+# OS files
+Thumbs.db
+ehthumbs.db
