@@ -14,3 +14,4 @@ pnpm-debug.log*
 # OS files
 Thumbs.db
 ehthumbs.db
+/src/generated/prisma
