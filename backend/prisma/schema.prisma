@@ -1,7 +1,5 @@
-// GasPoint / FlameIQ -Prisma schema
-// Covers: registration, profiles, vendors, ordering, delivery, payment,
-
-// gas usage prediction, reminders, and customer support.
+// GasPoint / FlameIQ Prisma schema
+// Covers authentication, profile management, reminders, and support.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,145 +9,77 @@ datasource db {
   provider = "postgresql"
 }
 
-// - Users (customers, students, business owners, admins)
 model User {
-  id             Int           @id @default(autoincrement())
-  name           String        
-  email          String        @unique
-  phone          String?
+  id             Int              @id @default(autoincrement())
+  name           String
+  email          String           @unique
   password       String
-  role           Role          @default(CUSTOMER)
+  role           Role             @default(USER)
   address        String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
 
-  orders         Order[]
+  profile        Profile?
   notifications  Notification[]
   gasPredictions GasPrediction[]
   supportTickets SupportTicket[]
 }
 
 enum Role {
-  CUSTOMER
-  VENDOR
+  USER
   ADMIN
 }
 
-// - Vendors (gas refill stations / distributors) -
-model Vendor {
-  id           Int            @id @default(autoincrement())
-  businessName String
-  email        String         @unique
-  phone        String
-  address      String
+model Profile {
+  id           Int         @id @default(autoincrement())
+  userId       Int         @unique
+  user         User        @relation(fields: [userId], references: [id])
+  profileType  ProfileType @default(USER)
+  businessName String?
+  email        String?     @unique
+  phone        String?
+  profilePic   String?
+  address      String?
   latitude     Float?
   longitude    Float?
-  isVerified   Boolean        @default(false)
-  createdAt    DateTime       @default(now())
-
-  products     Product[]
-  orders       Order[]
+  isVerified   Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
 }
 
-// - Products (cylinder sizes / refill options a vendor sells) -
-model Product {
-  id           Int            @id @default(autoincrement())
-  name         String         // e.g. "12.5kg Cylinder Refill"
-  price        Float
-  sizeKg       Float
-  vendorId     Int
-  vendor       Vendor         @relation(fields: [vendorId], references: [id])
-  orders       Order[]
+enum ProfileType {
+  USER
+  VENDOR
 }
 
-// - Orders -
-model Order {
-  id          Int             @id @default(autoincrement())
-  userId      Int
-  user        User            @relation(fields: [userId], references: [id])
-  vendorId    Int
-  vendor      Vendor          @relation(fields: [vendorId], references: [id])
-  productId   Int
-  product     Product         @relation(fields: [productId], references: [id])
-  quantity    Int             @default(1)
-  status      OrderStatus     @default(PENDING)
-  totalAmount Float
-  createdAt   DateTime        @default(now())
-
-  payment     Payment?
-  delivery    Delivery?
-}
-
-enum OrderStatus {
-  PENDING
-  CONFIRMED
-  OUT_FOR_DELIVERY
-  DELIVERED
-  CANCELLED
-}
-
-// - Payments -
-model Payment {
-  id          Int            @id @default(autoincrement())
-  orderId     Int            @unique
-  order       Order          @relation(fields: [orderId], references: [id])
-  amount      Float
-  method      String         // "card", "transfer", "wallet"
-  status      PaymentStatus  @default(PENDING)
-   createdAt  DateTime       @default(now())
-}
-
-enum PaymentStatus {
-  PENDING
-  SUCCESS
-  FAILED
-}
-
-// - Delivery tracking -
-model Delivery {
-  id         Int             @id @default(autoincrement())
-  orderId    Int             @unique
-  order      Order           @relation(fields: [orderId], references: [id])
-  status     DeliveryStatus  @default(ASSIGNED)
-  eta        DateTime?
-  updatedAt  DateTime        @updatedAt
-}
-
-enum DeliveryStatus {
-  ASSIGNED
-  IN_TRANSIT
-  DELIVERED
-}
-
-// - AI gas usage prediction -
 model GasPrediction {
-  id                   Int             @id @default(autoincrement())
-  userId               Int
-  user                 User            @relation(fields: [userId], references: [id])
-  estimatedEmptyDate   DateTime
-  confidence           Float?
-  createdAt            DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  user               User     @relation(fields: [userId], references: [id])
+  estimatedEmptyDate DateTime
+  confidence         Float?
+  createdAt          DateTime @default(now())
 }
 
-// - Refill reminders / notifications -
 model Notification {
-  id           Int              @id @default(autoincrement())
-  userId       Int
-  user         User             @relation(fields: [userId], references: [id])
-  message      String
-  isRead       Boolean          @default(false)
-  createdAt    DateTime         @default(now())
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
-// - Customer support -
 model SupportTicket {
-  id          Int               @id @default(autoincrement())
-  userId      Int
-  user        User              @relation(fields: [userId], references: [id])
-  subject     String
-  message     String
-  status      TicketStatus      @default(OPEN)
-  createdAt   DateTime          @default(now())
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id])
+  subject   String
+  message   String
+  status    TicketStatus @default(OPEN)
+  createdAt DateTime     @default(now())
 }
 
 enum TicketStatus {
