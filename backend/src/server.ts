@@ -1,6 +1,7 @@
 import express from 'express'
 import dotenv from 'dotenv'
 import { notificationService } from './services/notificationService.js'
+import { predictionJob } from './jobs/predictionJob.js'
 
 dotenv.config()
 
@@ -28,6 +29,10 @@ app.get('/api/notifications/stream', (req, res) => {
 
 
 const PORT = process.env.PORT || 3000
+
+// Initialize background jobs
+predictionJob.start();
+
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`Server running on http://localhost:${PORT}`)
