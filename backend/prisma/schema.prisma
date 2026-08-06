@@ -20,13 +20,15 @@ model User {
   password       String
   role           Role          @default(CUSTOMER)
   address        String?
+  isVerified     Boolean       @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  orders         Order[]
-  notifications  Notification[]
-  gasPredictions GasPrediction[]
-  supportTickets SupportTicket[]
+  orders            Order[]
+  notifications     Notification[]
+  gasPredictions    GasPrediction[]
+  supportTickets    SupportTicket[]
+  otpVerifications  OtpVerification[]
 }
 
 enum Role {
@@ -119,6 +121,18 @@ enum DeliveryStatus {
   ASSIGNED
   IN_TRANSIT
   DELIVERED
+}
+
+// - OTP Verification -
+model OtpVerification {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  codeHash  String    
+  purpose   String    // "REGISTRATION", "LOGIN", "PASSWORD_RESET"
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 }
 
 // - AI gas usage prediction -
