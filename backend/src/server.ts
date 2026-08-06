@@ -1,5 +1,6 @@
 import express from 'express'
 import dotenv from 'dotenv'
+import { notificationService } from './services/notificationService.js'
 
 dotenv.config()
 
@@ -9,6 +10,22 @@ app.use(express.json())
 app.get('/', (req, res) => {
   res.send('FLAMEIQ backend running')
 })
+
+// --- Server-Sent Events (SSE) Endpoint for Pop-up Notifications ---
+app.get('/api/notifications/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  
+  // Flush headers immediately
+  res.flushHeaders();
+
+  // Keep connection alive
+  res.write(': keep-alive\n\n');
+
+  notificationService.addClient(res);
+});
+
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
