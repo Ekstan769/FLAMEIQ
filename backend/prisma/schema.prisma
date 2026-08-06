@@ -1,0 +1,100 @@
+// GasPoint / FlameIQ Prisma schema
+// Covers authentication, profile management, reminders, and support.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             Int              @id @default(autoincrement())
+  name           String
+  email          String           @unique
+  password       String
+  role           Role             @default(USER)
+  address        String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  orders         Order[]
+  notifications  Notification[]
+  gasPredictions GasPrediction[]
+  supportTickets SupportTicket[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Profile {
+  id           Int         @id @default(autoincrement())
+  userId       Int         @unique
+  user         User        @relation(fields: [userId], references: [id])
+  profileType  ProfileType @default(USER)
+  businessName String?
+  email        String?     @unique
+  phone        String?
+  profilePic   String?
+  address      String?
+  latitude     Float?
+  longitude    Float?
+  isVerified   Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+}
+
+enum ProfileType {
+  USER
+  VENDOR
+}
+
+// - OTP Verification -
+model OtpVerification {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  codeHash  String    
+  purpose   String    // "REGISTRATION", "LOGIN", "PASSWORD_RESET"
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model GasPrediction {
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  user               User     @relation(fields: [userId], references: [id])
+  estimatedEmptyDate DateTime
+  confidence         Float?
+  createdAt          DateTime @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model SupportTicket {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id])
+  subject   String
+  message   String
+  status    TicketStatus @default(OPEN)
+  createdAt DateTime     @default(now())
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
