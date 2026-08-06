@@ -16,11 +16,10 @@ model User {
   password       String
   role           Role             @default(USER)
   address        String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  profile        Profile?
+  orders         Order[]
   notifications  Notification[]
   gasPredictions GasPrediction[]
   supportTickets SupportTicket[]
@@ -52,6 +51,18 @@ model Profile {
 enum ProfileType {
   USER
   VENDOR
+}
+
+// - OTP Verification -
+model OtpVerification {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id])
+  codeHash  String    
+  purpose   String    // "REGISTRATION", "LOGIN", "PASSWORD_RESET"
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 }
 
 model GasPrediction {
