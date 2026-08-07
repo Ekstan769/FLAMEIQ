@@ -27,7 +27,7 @@ export default function WelcomePage() {
       </header>
 
       {/* Hero */}
-      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 py-8 md:grid-cols-2 md:px-12 md:py-14">
+      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 py-8 md:grid-cols-2 md:px-12 md:py-14 bg-[url('/images/mb-hero-flameiq.png')] md:bg-[url('/images/hero-flameiq.png')] bg-contain bg-right bg-no-repeat">
         {/* Left: copy */}
         <div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-notify-50 px-3 py-1 text-xs font-semibold text-notify-700">
@@ -97,8 +97,8 @@ export default function WelcomePage() {
           </div>
         </div>
 
-        {/* Right: hero image, no card — floats directly on the page */}
-        <div className="w-full">
+        {/* Right: hero image, no card — floats directly on the page */} 
+        <div className="w-full h-full block md:hidden">
           <Image
             src="/images/hero-flameiq.png"
             alt="FlameIQ gas cylinder and mobile app"
@@ -106,8 +106,10 @@ export default function WelcomePage() {
             height={1200}
             priority
             sizes="(max-width: 768px) 100vw, 50dvw"
-            className="h-auto w-full object-cover"
+            className=" w-full object-cover"
           />
+          
+        
         </div>
       </section>
     </main>
