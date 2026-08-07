@@ -21,6 +21,11 @@ app.patch('/api/auth/profile', authenticate, updateProfile)
 
 // --- Server-Sent Events (SSE) Endpoint for Pop-up Notifications ---
 app.get('/api/notifications/stream', (req, res) => {
+  const clientId = req.query.clientId as string;
+  if (!clientId) {
+    return res.status(400).json({ error: 'clientId is required' });
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -31,9 +36,11 @@ app.get('/api/notifications/stream', (req, res) => {
   // Keep connection alive
   res.write(': keep-alive\n\n');
 
-  notificationService.addClient(res);
+  notificationService.addClient(clientId, res);
 });
 
+// --- Order Routes ---
+app.use('/api/orders', orderRoutes);
 
 const PORT = process.env.PORT || 3000
 
