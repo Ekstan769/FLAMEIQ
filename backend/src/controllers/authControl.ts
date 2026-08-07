@@ -1,0 +1,276 @@
+import { NextFunction, Request, Response } from "express";
+import { prisma } from "../db/prisma.js";
+import bcrypt from "bcrypt";
+import * as adminService from '../services/adminService.js'
+import { logger } from '../utils/logger.js';
+import jwt from "jsonwebtoken";
+//import { uploadToCloudinary } from "../utils/upload";
+
+
+
+// Interface extension so TypeScript allows req.user and req.file
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    role?: string;
+  };
+}
+
+export const authenticate = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  const header = req.headers.authorization;
+
+  if (!header?.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  const token = header.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+      id?: string;
+      role?: string;
+    };
+
+    req.user = {
+      id: String(decoded.id ?? ""),
+      role: decoded.role,
+    };
+
+    return next();
+  } catch (error) {
+    logger.error({ err: error }, "Invalid or expired auth token");
+    return res.status(401).json({ success: false, message: "Invalid or expired token" });
+  }
+};
+
+export const signUp = async(req: Request, res: Response) => {
+    const { name, email, password } = req.body
+
+    try {
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: "All fields required" });
+        }
+
+        const normalizedEmail = String(email).toLowerCase();
+
+        const existingUser = await prisma.user.findFirst({
+          where: { email: normalizedEmail, deletedAt: null },
+        });
+
+        if (existingUser) {
+          return res.status(409).json({ message: "User already exists" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const user = await prisma.user.create({
+          data: {
+            name,
+            email: normalizedEmail,
+            password: hashedPassword,
+          },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        });
+
+        const payload = {
+          id: Number(user.id),
+          email: String(user.email),
+          role: String(user.role),
+        };
+
+        const token = jwt.sign(
+          payload,
+          process.env.JWT_SECRET as string,
+          {
+            expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any
+          }
+        );
+
+        return res.status(201).json({
+          success: true,
+          message: "User created successfully",
+          token,
+          user,
+        });
+    } catch (error) {
+        logger.error({ err: error }, "Sign-up process failed unexpectedly");
+
+        return res.status(500).json({
+          success: false,
+          message: "Unexpected error sign up failed."
+        });
+    }
+}
+
+
+
+export const signIn = async (req: Request, res: Response) =>{
+  const {email, password}= req.body;
+  try{
+    if (!email||!password){
+      return res.status(400).json({
+        success: false,
+        message: "email and password required"
+      });
+    }
+    //find by email
+    const user = await prisma.user.findFirst({
+      where: {
+        email: email.toLowerCase(),
+        deletedAt: null,
+      },
+      include: { profile: true },
+    });
+
+    if(!user){
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password"
+      });
+    }
+    const PasswordValid = await bcrypt.compare(password, user.password);
+    if(!PasswordValid){
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password"
+      });
+    }
+
+
+    
+   
+const payload = { 
+  id: Number(user.id),    
+  email: String(user.email),
+  role: String(user.role),
+};
+
+// 2. Pass the clean payload and cast the options
+const token = jwt.sign(
+  payload, 
+  process.env.JWT_SECRET as string, 
+  { 
+    expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any // 'any' bypasses strict type checking for the option
+  }
+);
+
+
+    return res.status(200).json({
+      success: true,
+      message: "Sign-in completed",
+      token,
+      user:{
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
+      },
+    });
+  } catch (error){
+    logger.error({err: error}, "#panic sign in process failed");
+
+  
+    return res.status(500).json({
+      success: false,
+      message: "unexpected server error"
+    });
+
+  }
+};
+
+//get all users to be used by admin
+export const getUsers = async (req: Request, res: Response) => {
+  try {
+    const users = await adminService.getAllUsers();
+
+    // Return a structured, successful JSON response
+    return res.status(200).json({
+      success: true,
+      data: users
+    });
+  } catch (error) {
+    // The service already logged the full trace, so just sending the user response here
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users"
+    });
+  }
+};
+
+export const deleteUsers = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    return await adminService.adminDeleteUser(req, res);
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users"
+    });
+  }
+};
+
+export const deleteSelf = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    return await adminService.selfDeleteUser(req, res);
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete your account"
+    });
+  }
+};
+
+export const updateProfile = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ success: false, message: "Unauthorized access." });
+    }
+
+    const userId = Number(req.user.id);
+    const { businessName, phone, address, isVendor, profilePic } = req.body;
+
+    const existingProfile = await prisma.profile.findUnique({
+      where: { userId },
+      select: { profileType: true },
+    });
+
+    const profileType = isVendor === true ? "VENDOR" : (existingProfile?.profileType ?? "USER");
+
+    const profile = await prisma.profile.upsert({
+      where: { userId },
+      update: {
+        profileType,
+        ...(businessName !== undefined ? { businessName: businessName ? String(businessName) : null } : {}),
+        ...(phone !== undefined ? { phone: phone ? String(phone) : null } : {}),
+        ...(address !== undefined ? { address: address ? String(address) : null } : {}),
+        ...(profilePic !== undefined ? { profilePic: profilePic ? String(profilePic) : null } : {}),
+        deletedAt: null,
+      },
+      create: {
+        userId,
+        profileType,
+        businessName: businessName ? String(businessName) : null,
+        phone: phone ? String(phone) : null,
+        address: address ? String(address) : null,
+        profilePic: profilePic ? String(profilePic) : null,
+        email: null,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      profile,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Profile update failed");
+    return res.status(500).json({ success: false, message: "Failed to update profile" });
+  }
+};
+
+

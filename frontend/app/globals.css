@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand blue — Logo, primary buttons, borders on secondary buttons */
+  --color-brand-50: #D2DCE4;
+  --color-brand-100: #B4C4D2;
+  --color-brand-200: #8FA7B6;
+  --color-brand-300: #6A89A6;
+  --color-brand-400: #446C8F;
+  --color-brand-500: #1F4E79; /* base */
+  --color-brand-600: #1A4165;
+  --color-brand-700: #153451;
+  --color-brand-800: #10273D;
+  --color-brand-900: #0A1A28;
+  --color-brand-950: #061018;
+  --color-brand-hover: #163B5C;
+
+  /* Link teal */
+  --color-link-50: #D4F4F8;
+  --color-link-100: #B7ECF3;
+  --color-link-200: #93E3ED;
+  --color-link-300: #6ED9E6;
+  --color-link-400: #4AD0E0;
+  --color-link-500: #26C6DA; /* base */
+  --color-link-600: #20A5B6;
+  --color-link-700: #198491;
+  --color-link-800: #13636D;
+  --color-link-900: #0D4249;
+  --color-link-950: #08282C;
+
+  /* Notification amber */
+  --color-notify-50: #FDF0CC;
+  --color-notify-100: #FBE6AA;
+  --color-notify-200: #FADA80;
+  --color-notify-300: #F8CD55;
+  --color-notify-400: #F6C12A;
+  --color-notify-500: #F4B400; /* base */
+  --color-notify-600: #CB9600;
+  --color-notify-700: #A37800;
+  --color-notify-800: #7A5A00;
+  --color-notify-900: #513C00;
+  --color-notify-950: #312400;
+
+  /* Muted — secondary text */
+  --color-muted-50: #E0E3E8;
+  --color-muted-100: #CBD1D8;
+  --color-muted-200: #B2BAC5;
+  --color-muted-300: #98A2B2;
+  --color-muted-400: #7E8B9E;
+  --color-muted-500: #64748B; /* base */
+  --color-muted-600: #536174;
+  --color-muted-700: #434D5D;
+  --color-muted-800: #323A46;
+  --color-muted-900: #21272E;
+  --color-muted-950: #14171C;
+
+  /* Ink — primary text */
+  --color-ink-50: #D2D4D8;
+  --color-ink-100: #B4B8BE;
+  --color-ink-200: #8F949D;
+  --color-ink-300: #69707C;
+  --color-ink-400: #444D5C;
+  --color-ink-500: #1E293B; /* base */
+  --color-ink-600: #192231;
+  --color-ink-700: #141B27;
+  --color-ink-800: #0F151E;
+  --color-ink-900: #0A0E14;
+  --color-ink-950: #06080C;
+
+  /* Semantic aliases straight from the brand sheet */
+  --color-success: #22C55E;
+  --color-error: #EF4444;
+  --color-background: #F8FAFC;
+  --color-card: #FFFFFF;
+  --color-border: #E2E8F0;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-ink-500);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.font-heading {
+  font-family: "Sora", Arial, Helvetica, sans-serif;
+}

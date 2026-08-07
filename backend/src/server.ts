@@ -1,8 +1,9 @@
 import express from 'express'
 import dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
 import { notificationService } from './services/notificationService.js'
 import { predictionJob } from './jobs/predictionJob.js'
-import orderRoutes from './routes/orderRoutes.js'
+import { authenticate, signIn, signUp, updateProfile } from './controllers/authControl.js'
 
 dotenv.config()
 
@@ -12,6 +13,11 @@ app.use(express.json())
 app.get('/', (req, res) => {
   res.send('FLAMEIQ backend running')
 })
+
+app.post('/api/auth/signup', signUp)
+app.post('/api/auth/signin', signIn)
+app.put('/api/auth/profile', authenticate, updateProfile)
+app.patch('/api/auth/profile', authenticate, updateProfile)
 
 // --- Server-Sent Events (SSE) Endpoint for Pop-up Notifications ---
 app.get('/api/notifications/stream', (req, res) => {
@@ -38,12 +44,16 @@ app.use('/api/orders', orderRoutes);
 
 const PORT = process.env.PORT || 3000
 
-// Initialize background jobs
-predictionJob.start();
+const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url)
 
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Server running on http://localhost:${PORT}`)
-})
+if (isDirectRun) {
+  // Initialize background jobs
+  predictionJob.start();
+
+  app.listen(PORT, () => {
+    // eslint-disable-next-line no-console
+    console.log(`Server running on http://localhost:${PORT}`)
+  })
+}
 
 export default app
