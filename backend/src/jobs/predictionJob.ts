@@ -24,8 +24,9 @@ class PredictionJob {
           prediction: 'Market analysis complete (cron)',
         });
 
-        // 3. Trigger a push notification to all connected frontend clients
-        notificationService.broadcast({
+        // 3. Trigger a push notification to specific clients
+        // TODO: Replace the empty array with the specific client IDs you want to notify.
+        notificationService.sendToClients([], {
           title: 'New Automated Prediction',
           message: prediction.prediction,
           type: 'info',

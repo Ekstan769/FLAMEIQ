@@ -119,8 +119,11 @@ export const signIn = async (req: Request, res: Response) =>{
       });
     }
     //find by email
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+    const user = await prisma.user.findFirst({
+      where: {
+        email: email.toLowerCase(),
+        deletedAt: null,
+      },
       include: { profile: true },
     });
 

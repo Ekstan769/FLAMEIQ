@@ -8,26 +8,26 @@ export interface NotificationPayload {
 }
 
 class NotificationService {
-  // Store connected clients
-  private clients: Response[] = [];
+  // Store connected clients by their unique ID
+  private clients: Map<string, Response> = new Map();
 
   /**
    * Adds a new client connection to the stream.
    */
-  public addClient(res: Response) {
-    this.clients.push(res);
+  public addClient(clientId: string, res: Response) {
+    this.clients.set(clientId, res);
 
     // Remove client when they close the connection
     res.on('close', () => {
-      this.clients = this.clients.filter((client) => client !== res);
+      this.clients.delete(clientId);
     });
   }
 
   /**
-   * Broadcasts a notification to all connected clients.
-   * This allows the frontend to show pop-up notifications.
+   * Sends a notification to specific clients.
+   * This allows the frontend to show pop-up notifications to targeted users.
    */
-  public broadcast(payload: NotificationPayload) {
+  public sendToClients(clientIds: string[], payload: NotificationPayload) {
     const data = {
       ...payload,
       timestamp: payload.timestamp || new Date().toISOString(),
@@ -36,12 +36,17 @@ class NotificationService {
     // SSE format requires data to be prefixed with 'data: ' and end with '\n\n'
     const eventString = `data: ${JSON.stringify(data)}\n\n`;
 
-    this.clients.forEach((client) => {
-      client.write(eventString);
+    let sentCount = 0;
+    clientIds.forEach((clientId) => {
+      const client = this.clients.get(clientId);
+      if (client) {
+        client.write(eventString);
+        sentCount++;
+      }
     });
 
     // eslint-disable-next-line no-console
-    console.log(`[Notification Service] Broadcasted to ${this.clients.length} clients: ${payload.title}`);
+    console.log(`[Notification Service] Sent notification to ${sentCount} specific clients: ${payload.title}`);
   }
 }
 

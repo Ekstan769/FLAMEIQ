@@ -27,12 +27,18 @@ export default function WelcomePage() {
         </div>
       </header>
 
-      <section className="grid flex-1 grid-cols-1 md:grid-cols-[2fr_3fr] items-stretch overflow-hidden">
-        
-        <div className="flex flex-col justify-center py-10 pl-6 md:pl-12 lg:pl-20 pr-2">
-          <div className="w-full max-w-xl">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-notify-50 px-3 py-1 text-xs font-semibold text-notify-700">
-              <Flame size={12} /> Smart Gas Delivery
+      {/* Hero */}
+      <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 py-8 md:grid-cols-2 md:px-12 md:py-14 bg-[url('/images/mb-hero-flameiq.png')] md:bg-[url('/images/hero-flameiq.png')] bg-contain bg-right bg-no-repeat">
+        {/* Left: copy */}
+        <div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-notify-50 px-3 py-1 text-xs font-semibold text-notify-700">
+            <Flame size={12} /> Smart Gas Delivery
+          </span>
+
+          <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
+            <span className="text-ink-500">
+              Smart Gas. <br />
+              Delivered Before <br />
             </span>
 
             <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
@@ -97,16 +103,20 @@ export default function WelcomePage() {
           </div>
         </div>
 
-        <div className="relative min-h-[400px] w-full h-full">
+        {/* Right: hero image, no card — floats directly on the page 
+        <div className="w-full h-full block md:hidden">
           <Image
             src="/images/hero-flameiq.png"
             alt="FlameIQ gas cylinder and mobile app"
             fill
             priority
-            sizes="(max-width: 768px) 100vw, 60vw"
-            className="object-cover object-left"
+            sizes="(max-width: 768px) 100vw, 50dvw"
+            className=" w-full object-cover"
           />
+          
+        
         </div>
+        */} 
       </section>
     </main>
   );
