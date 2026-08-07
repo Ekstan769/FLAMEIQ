@@ -35,11 +35,6 @@ export default function WelcomePage() {
             <Flame size={12} /> Smart Gas Delivery
           </span>
 
-          <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
-            <span className="text-ink-500">
-              Smart Gas. <br />
-              Delivered Before <br />
-            </span>
 
             <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
               <span className="text-ink-500">
@@ -101,7 +96,7 @@ export default function WelcomePage() {
               </div>
             </div>
           </div>
-        </div>
+        
 
         {/* Right: hero image, no card — floats directly on the page 
         <div className="w-full h-full block md:hidden">
