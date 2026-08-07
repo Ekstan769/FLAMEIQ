@@ -54,10 +54,14 @@ export const adminDeleteUser = async (req: AuthenticatedRequest, res: Response):
   }
 
   try {
-    await prisma.user.update({
+    const result = await prisma.user.updateMany({
       where: { id: targetUserId, deletedAt: null },
       data: { deletedAt: new Date() },
     });
+
+    if (result.count === 0) {
+      return res.status(404).json({ success: false, message: "User not found or already deleted." });
+    }
 
     return res.status(200).json({ success: true, message: `User account (ID: ${targetUserId}) has been soft-deleted by Admin.` });
   } catch (error) {
@@ -74,10 +78,14 @@ export const selfDeleteUser = async (req: AuthenticatedRequest, res: Response): 
   const targetUserId = Number(req.user.id);
 
   try {
-    await prisma.user.update({
+    const result = await prisma.user.updateMany({
       where: { id: targetUserId, deletedAt: null },
       data: { deletedAt: new Date() },
     });
+
+    if (result.count === 0) {
+      return res.status(404).json({ success: false, message: "Account not found or already deleted." });
+    }
 
     return res.status(200).json({ success: true, message: "Your account has been soft-deleted successfully." });
   } catch (error) {
