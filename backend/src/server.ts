@@ -2,6 +2,7 @@ import express from 'express'
 import dotenv from 'dotenv'
 import { notificationService } from './services/notificationService.js'
 import { predictionJob } from './jobs/predictionJob.js'
+import orderRoutes from './routes/orderRoutes.js'
 
 dotenv.config()
 
@@ -32,6 +33,8 @@ app.get('/api/notifications/stream', (req, res) => {
   notificationService.addClient(clientId, res);
 });
 
+// --- Order Routes ---
+app.use('/api/orders', orderRoutes);
 
 const PORT = process.env.PORT || 3000
 
