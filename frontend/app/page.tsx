@@ -97,7 +97,7 @@ export default function WelcomePage() {
           </div>
         </div>
 
-        {/* Right: hero image, no card — floats directly on the page */} 
+        {/* Right: hero image, no card — floats directly on the page 
         <div className="w-full h-full block md:hidden">
           <Image
             src="/images/hero-flameiq.png"
@@ -111,6 +111,7 @@ export default function WelcomePage() {
           
         
         </div>
+        */} 
       </section>
     </main>
   );
