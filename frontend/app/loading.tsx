@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { Flame } from "lucide-react";
 
 export default function Loading() {
   return (
@@ -19,9 +18,14 @@ export default function Loading() {
 
         {/* Section 2: text */}
         <div className="mt-6">
-          {/* Swap the Flame icon for <Image src="/images/logo.png" .../> once the logo is ready */}
-          <div className="flex items-center justify-center gap-1.5">
-            <Flame size={22} className="text-notify-500" fill="currentColor" />
+          <div className="flex items-center justify-center gap-3">
+            <Image
+              src="/images/logo.svg"
+              alt="FlameIQ logo"
+              width={110}
+              height={32}
+              className="h-8 w-auto"
+            />
             <span className="font-heading text-xl font-bold text-ink-500">
               FlameIQ
             </span>
