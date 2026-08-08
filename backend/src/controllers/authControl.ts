@@ -77,6 +77,17 @@ export const signUp = async(req: Request, res: Response) => {
           },
         });
 
+        const clientIp = (req as any).clientIp || '0.0.0.0';
+        const userAgent = req.headers['user-agent'] || 'unknown';
+        await prisma.loginHistory.create({
+          data: {
+            userId: user.id,
+            ipAddress: clientIp,
+            userAgent: userAgent
+          }
+        });
+        logger.info(`User ${user.email} signed up from IP ${clientIp}`);
+
         const payload = {
           id: Number(user.id),
           email: String(user.email),
@@ -135,11 +146,23 @@ export const signIn = async (req: Request, res: Response) =>{
     }
     const PasswordValid = await bcrypt.compare(password, user.password);
     if(!PasswordValid){
+      logger.warn(`Failed login attempt for email ${email} from IP ${(req as any).clientIp}`);
       return res.status(401).json({
         success: false,
         message: "Invalid email or password"
       });
     }
+
+    const clientIp = (req as any).clientIp || '0.0.0.0';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    await prisma.loginHistory.create({
+      data: {
+        userId: user.id,
+        ipAddress: clientIp,
+        userAgent: userAgent
+      }
+    });
+    logger.info(`User ${user.email} signed in from IP ${clientIp}`);
 
 
     
