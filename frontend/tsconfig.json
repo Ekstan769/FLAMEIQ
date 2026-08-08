@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "components/auth/LoginForm.tsx", "components/auth/SignupForm.tsx", "app/(auth)/signup"  ],
   "exclude": ["node_modules"]
 }

@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+:root{
+  --background:#F8FAFC;
+  --foreground:#1E293B;
+
+  --primary:#1F4E79;
+  --primary-hover:#163B5C;
+
+  --secondary:#64748B;
+
+  --border:#E2E8F0;
+
+  --success:#22C55E;
+  --error:#EF4444;
+
+  --white:#FFFFFF;
+
+  --link:#2563EB;
+}

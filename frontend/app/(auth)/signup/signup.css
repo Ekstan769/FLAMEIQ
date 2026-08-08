@@ -1,0 +1,431 @@
+/* ================================
+   SIGNUP PAGE
+================================ */
+
+.signup-page {
+  min-height: 100vh;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+
+/* ================================
+   HEADER
+================================ */
+
+.signup-header {
+  height: 68px;
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 58px;
+
+  background: #ffffff;
+
+  box-sizing: border-box;
+
+  position: relative;
+  z-index: 20;
+}
+
+
+/* LOGO */
+
+.logo {
+  font-size: 22px;
+  font-weight: 700;
+  color: #174d85;
+}
+
+.logo strong {
+  color: #f5a400;
+}
+
+
+/* LOGIN */
+
+.login-link {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+
+  color: #173d68;
+
+  font-size: 14px;
+}
+
+.login-link button {
+  width: 98px;
+  height: 38px;
+
+  border: 1px solid #174d85;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #174d85;
+
+  cursor: pointer;
+
+  font-size: 14px;
+}
+
+.login-link button:hover {
+  background: #f5f9fd;
+}
+
+
+/* ================================
+   SIGNUP SECTION
+================================ */
+
+.signup-section {
+  position: relative;
+
+  width: 100%;
+  height: calc(100vh - 68px);
+
+  min-height: 700px;
+
+  overflow: hidden;
+
+  background: #ffffff;
+}
+
+
+/* ================================
+   BACKGROUND IMAGE
+================================ */
+
+.signup-background {
+  position: absolute;
+
+  top: 0;
+  right: 0;
+
+  width: 77.5%;
+  height: 100%;
+
+  z-index: 1;
+
+  overflow: hidden;
+
+  background: #f7f8fc;
+}
+
+.signup-background img {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+
+  object-position: center center;
+}
+
+
+/* ================================
+   FORM OVERLAY
+================================ */
+
+.signup-form-container {
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  z-index: 5;
+
+  width: 560px;
+  height: 100%;
+
+  padding: 43px 50px 35px 46px;
+
+  box-sizing: border-box;
+
+  background: rgba(255, 255, 255, 0.88);
+
+  /*
+    IMPORTANT:
+    No solid white background.
+    The image stays visible behind the form.
+  */
+  background: rgba(255, 255, 255, 0.20);
+
+  backdrop-filter: blur(2px);
+}
+
+
+/* ================================
+   ICON
+================================ */
+
+.signup-icon {
+  width: 70px;
+  height: 70px;
+
+  margin: 0 auto 18px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border: 1px solid #f4c58c;
+
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.55);
+
+  color: #174d85;
+
+  font-size: 25px;
+}
+
+
+/* ================================
+   TITLE
+================================ */
+
+.signup-form-container h1 {
+  margin: 0 0 8px;
+
+  text-align: center;
+
+  color: #102d4f;
+
+  font-size: 27px;
+
+  font-weight: 600;
+}
+
+.signup-form-container > p {
+  margin: 0 0 27px;
+
+  text-align: center;
+
+  color: #526b84;
+
+  font-size: 14px;
+}
+
+
+/* ================================
+   FORM
+================================ */
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+
+  margin-bottom: 7px;
+
+  color: #173d68;
+
+  font-size: 14px;
+
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  height: 55px;
+
+  box-sizing: border-box;
+
+  padding: 0 16px;
+
+  border: 1px solid #d2deeb;
+
+  border-radius: 9px;
+
+  outline: none;
+
+  background: rgba(255, 255, 255, 0.88);
+
+  color: #173d68;
+
+  font-size: 14px;
+}
+
+.form-group input::placeholder {
+  color: #9aa8b8;
+}
+
+.form-group input:focus {
+  border-color: #258dd8;
+
+  background: #ffffff;
+
+  box-shadow: 0 0 0 2px rgba(37, 141, 216, 0.08);
+}
+
+
+/* ================================
+   TERMS
+================================ */
+
+.terms {
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 9px;
+
+  margin: 18px 0;
+}
+
+.terms input {
+  width: 17px;
+  height: 17px;
+
+  margin-top: 1px;
+
+  flex-shrink: 0;
+}
+
+.terms label {
+  color: #52677e;
+
+  font-size: 12px;
+
+  line-height: 1.5;
+}
+
+.terms strong {
+  color: #174d85;
+}
+
+
+/* ================================
+   GET STARTED BUTTON
+================================ */
+
+.get-started {
+  width: 100%;
+  height: 55px;
+
+  border: none;
+
+  border-radius: 9px;
+
+  background: #198bd3;
+
+  color: #ffffff;
+
+  font-size: 16px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.get-started:hover {
+  background: #147cbe;
+}
+
+
+/* ================================
+   TABLET
+================================ */
+
+@media (max-width: 1100px) {
+
+  .signup-form-container {
+    width: 480px;
+
+    padding-left: 35px;
+    padding-right: 35px;
+  }
+
+}
+
+
+/* ================================
+   MOBILE
+================================ */
+
+@media (max-width: 768px) {
+
+  .signup-header {
+    height: 65px;
+
+    padding: 0 20px;
+  }
+
+  .logo {
+    font-size: 20px;
+  }
+
+  .login-link {
+    gap: 8px;
+  }
+
+  .login-link span {
+    display: none;
+  }
+
+  .login-link button {
+    width: 80px;
+    height: 35px;
+  }
+
+
+  .signup-section {
+    height: auto;
+
+    min-height: calc(100vh - 65px);
+
+    overflow: visible;
+  }
+
+
+  /* Keep image behind everything */
+
+  .signup-background {
+    position: absolute;
+
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+  }
+
+ .signup-background img {
+  width: 100%;
+  height: 100%;
+
+  display: block;
+
+  object-fit: cover;
+
+  object-position: center center;
+}
+
+  /* Form becomes an overlay */
+
+ .signup-form-container {
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  z-index: 5;
+
+  width: 560px;
+  height: 100%;
+
+  box-sizing: border-box;
+
+  padding: 43px 50px 35px 46px;
+
+  background: rgba(255, 255, 255, 0.82);
+}
+
+}
