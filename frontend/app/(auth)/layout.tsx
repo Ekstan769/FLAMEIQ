@@ -1,11 +1,9 @@
-﻿export default function AuthLayout({
+﻿import type { ReactNode } from "react";
+
+export default function SignupLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      {children}
-    </div>
-  );
+  return <>{children}</>;
 }
