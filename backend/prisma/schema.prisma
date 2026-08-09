@@ -24,6 +24,8 @@ model User {
   notifications  Notification[]
   gasPredictions GasPrediction[]
   supportTickets SupportTicket[]
+  loginHistories LoginHistory[]
+  wallet         Wallet?
 }
 
 enum Role {
@@ -99,3 +101,54 @@ enum TicketStatus {
   IN_PROGRESS
   RESOLVED
 }
+
+model LoginHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  ipAddress String
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+model Wallet {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+  balance   Float    @default(0.0)
+  currency  String   @default("NGN") // Defaulting to Naira since in Africa, could be adjusted
+  status    WalletStatus @default(ACTIVE)
+  
+  transactions Transaction[]
+}
+
+enum WalletStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+model Transaction {
+  id          Int      @id @default(autoincrement())
+  walletId    Int
+  wallet      Wallet   @relation(fields: [walletId], references: [id])
+  amount      Float
+  type        TxType
+  status      TxStatus
+  reference   String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+enum TxType {
+  DEPOSIT
+  WITHDRAWAL
+  PAYMENT
+  REFUND
+}
+
+enum TxStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
