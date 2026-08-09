@@ -31,22 +31,22 @@ export default function WelcomePage() {
       <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 py-8 md:grid-cols-2 md:px-12 md:py-14 bg-[url('/images/mb-hero-flameiq.png')] md:bg-[url('/images/hero-flameiq.png')] bg-contain bg-right bg-no-repeat">
         {/* Left: copy */}
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-notify-50 px-3 py-1 text-xs font-semibold text-notify-700">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
             <Flame size={12} /> Smart Gas Delivery
           </span>
 
-          <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
+          <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl"/>
             <span className="text-ink-500">
-              Smart Gas. <br />
-              Delivered Before <br />
+              {/* Smart Gas. <br />
+              Delivered Before <br /> */}
             </span>
 
             <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
-              <span className="text-ink-500">
+              <span className="text-ink-900">
                 Smart Gas. <br />
                 Delivered Before <br />
               </span>
-              <span className="text-link-500">You Need It.</span>
+              <span className="text-brand-500">You Need It.</span> 
             </h1>
 
             <p className="mt-5 text-[15px] leading-relaxed text-muted-500">
@@ -101,7 +101,6 @@ export default function WelcomePage() {
               </div>
             </div>
           </div>
-        </div>
 
         {/* Right: hero image, no card — floats directly on the page 
         <div className="w-full h-full block md:hidden">

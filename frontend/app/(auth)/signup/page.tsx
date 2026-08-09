@@ -1,7 +1,7 @@
-﻿export default function SignUpPage() {
+export default function SignUpPage() {
   return (
-    <main className="w-full max-w-sm">
-      <h1 className="text-xl font-bold text-slate-900">Sign Up</h1>
-    </main>
+    <div className="w-full max-w-sm text-center text-sm text-muted-500">
+      Sign up page — in progress
+    </div>
   );
 }
