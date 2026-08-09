@@ -1,111 +1,184 @@
-import "./signup.css";
+"use client";
+
 import Link from "next/link";
+import {
+  UserRound,
+  Mail,
+  LockKeyhole,
+  Eye,
+  Apple,
+} from "lucide-react";
+
+import "./signup.css";
 
 export default function SignupPage() {
   return (
     <main className="signup-page">
-      {/* Header */}
+
+      {/* ================= HEADER ================= */}
+
       <header className="signup-header">
-        <Link href="/" className="logo">
-          🔥 Flame<strong>IQ</strong>
+
+        <Link href="/" className="signup-logo">
+          <img
+            src="/images/logo.svg"
+            alt="FlameIQ"
+          />
         </Link>
 
         <div className="login-link">
           <span>Already have an account?</span>
 
           <Link href="/login">
-            Login
+            <button type="button">
+              Login
+            </button>
           </Link>
         </div>
+
       </header>
 
-      {/* Signup Section */}
+
+      {/* ================= MAIN ================= */}
+
       <section className="signup-section">
-        {/* Background Image */}
+
+        {/* BACKGROUND ARTWORK */}
+
         <div className="signup-background">
+
           <img
             src="/images/gas-phone.png"
             alt="FlameIQ gas cylinder and mobile application"
           />
+
         </div>
 
-        {/* Form Overlay */}
+
+        {/* FORM */}
+
         <div className="signup-form-container">
-          {/* Signup Icon */}
+
+          {/* Profile icon */}
+
           <div className="signup-icon">
-            ♙
+            <UserRound />
           </div>
 
+
           {/* Heading */}
-          <h1>Create Your Account</h1>
+
+          <h1>
+            Create Your Account
+          </h1>
 
           <p>
             Input your details to create a new account.
           </p>
 
-          {/* Signup Form */}
+
           <form>
+
             {/* Full Name */}
+
             <div className="form-group">
+
               <label htmlFor="fullName">
                 Full Name
               </label>
 
-              <input
-                id="fullName"
-                name="fullName"
-                type="text"
-                placeholder="Enter your full name"
-              />
+              <div className="input-wrapper">
+
+                <input
+                  id="fullName"
+                  type="text"
+                  placeholder="Enter your full name"
+                />
+
+              </div>
+
             </div>
 
+
             {/* Email */}
+
             <div className="form-group">
+
               <label htmlFor="email">
                 Email Address
               </label>
 
-              <input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="Enter email address"
-              />
+              <div className="input-wrapper">
+
+                <Mail />
+
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="Enter email address"
+                />
+
+              </div>
+
             </div>
 
+
             {/* Password */}
+
             <div className="form-group">
+
               <label htmlFor="password">
                 Create a New Password
               </label>
 
-              <input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Enter new password"
-              />
+              <div className="input-wrapper">
+
+                <LockKeyhole />
+
+                <input
+                  id="password"
+                  type="password"
+                  placeholder="Enter new password"
+                />
+
+                <Eye />
+
+              </div>
+
             </div>
 
+
             {/* Confirm Password */}
+
             <div className="form-group">
+
               <label htmlFor="confirmPassword">
                 Confirm New Password
               </label>
 
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                placeholder="Re-type your password to confirm"
-              />
+              <div className="input-wrapper">
+
+                <LockKeyhole />
+
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Re-type your password to confirm"
+                />
+
+                <Eye />
+
+              </div>
+
             </div>
 
+
             {/* Terms */}
+
             <div className="terms">
+
               <input
                 id="terms"
-                name="terms"
                 type="checkbox"
               />
 
@@ -115,18 +188,44 @@ export default function SignupPage() {
                 and{" "}
                 <strong>Privacy Policy</strong>.
               </label>
+
             </div>
 
-            {/* Button */}
+
+            {/* Social buttons */}
+
+            <div className="social-buttons">
+
+              <button type="button">
+                <Apple size={18} fill="currentColor" />
+                Apple
+              </button>
+
+              <button type="button">
+                <span style={{ color: "#4285F4", fontWeight: 700 }}>
+                  G
+                </span>
+                Google
+              </button>
+
+            </div>
+
+
+            {/* Get Started */}
+
             <button
               type="submit"
               className="get-started"
             >
               Get Started ↗
             </button>
+
           </form>
+
         </div>
+
       </section>
+
     </main>
   );
 }
