@@ -22,9 +22,28 @@ enum TxStatus {
   FAILED
 }
 
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  ON_ROUTE
+  DELIVERED
+  CANCELLED
+}
+
+enum OrderType {
+  STANDARD
+  QUICK
+}
+
 enum Role {
   USER
   ADMIN
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
 }
 
 enum ProfileType {
@@ -40,29 +59,33 @@ enum TicketStatus {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
+  id        String    @id @default(uuid()) // Changed to UUID
   name      String
   email     String    @unique
   password  String
+  riskLevel  RiskLevel?
   role      Role      @default(USER)
-  address   String?
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  profile          Profile[]
-  notifications    Notification[]
+  profile          Profile?
+  notifications    Notification[] // The relation name on the User model should be plural
   gasPredictions   GasPrediction[]
   supportTickets   SupportTicket[]
   loginHistories   LoginHistory[]
   transactions     Transaction[]
   otpVerifications OtpVerification[]
+  authoredReviews  Review[]          @relation("AuthoredReviews")
+  receivedReviews  Review[]          @relation("ReceivedReviews")
+  orders           Order[]           @relation("UserOrders") // Added for Order.user relation
+  vendorOrders     Order[]           @relation("VendorOrders") // Added for Order.vendor relation
 }
 
 model Profile {
-  id           Int         @id @default(autoincrement())
-  userId       Int         @unique
-  user         User        @relation(fields: [userId], references: [id])
+  id           String      @id @default(uuid()) // Changed to UUID
+  userId       String      @unique // Changed to String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   profileType  ProfileType @default(USER)
   businessName String?
   email        String?     @unique
@@ -80,8 +103,8 @@ model Profile {
 // - OTP Verification -
 model OtpVerification {
   id        Int       @id @default(autoincrement())
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id])
+  userId    String // Changed to String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade) // Added onDelete: Cascade
   codeHash  String
   purpose   String // "REGISTRATION", "LOGIN", "PASSWORD_RESET"
   expiresAt DateTime
@@ -90,50 +113,113 @@ model OtpVerification {
 }
 
 model GasPrediction {
-  id                 Int      @id @default(autoincrement())
-  userId             Int
+  id                 String   @id @default(uuid()) // Changed to UUID
+  userId             String // Changed to String
   user               User     @relation(fields: [userId], references: [id])
   estimatedEmptyDate DateTime
   confidence         Float?
   createdAt          DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Notification {
-  id        Int      @id @default(autoincrement())
-  userId    Int
+  id        String   @id @default(uuid()) // Changed to UUID
+  userId    String // Changed to String
   user      User     @relation(fields: [userId], references: [id])
   message   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model SupportTicket {
-  id        Int          @id @default(autoincrement())
-  userId    Int
+  id        String       @id @default(uuid()) // Changed to UUID
+  userId    String // Changed to String
   user      User         @relation(fields: [userId], references: [id])
   subject   String
   message   String
   status    TicketStatus @default(OPEN)
   createdAt DateTime     @default(now())
+
+  @@index([userId])
 }
 
 model LoginHistory {
-  id        Int      @id @default(autoincrement())
-  userId    Int
+  id        String   @id @default(uuid()) // Changed to UUID
+  userId    String // Changed to String
   user      User     @relation(fields: [userId], references: [id])
   ipAddress String
   userAgent String?
   createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Transaction {
-  id          Int      @id @default(autoincrement())
-  amount      Float
+  id          String   @id @default(uuid()) // Changed to UUID
+  amount      Decimal
   type        TxType
   status      TxStatus
   reference   String   @unique
   description String?
   createdAt   DateTime @default(now())
-  user        User?    @relation(fields: [userId], references: [id])
-  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId      String? // Changed to String
+
+  @@index([userId])
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  userId      String
+  user        User        @relation("UserOrders", fields: [userId], references: [id], onDelete: Cascade) // Added relation name
+  vendorId    String // This should relate to a User with the VENDOR role
+  vendor      User        @relation("VendorOrders", fields: [vendorId], references: [id], onDelete: NoAction)
+  status      OrderStatus @default(PENDING)
+  type        OrderType
+  totalAmount Decimal
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items OrderItem[]
+  review Review?
+
+  @@index([userId])
+  @@index([vendorId])
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  name      String
+  quantity  Int
+  price     Decimal
+
+  @@index([orderId])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int // A numeric rating, e.g., from 1 to 5.
+  comment   String? // Optional text comment from the user.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation to the User who wrote the review (the author).
+  authorId  String
+  author    User     @relation("AuthoredReviews", fields: [authorId], references: [id], onDelete: Cascade)
+
+  // Relation to the User who is being reviewed (the vendor).
+  targetUserId String
+  targetUser   User     @relation("ReceivedReviews", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  // Each review is uniquely tied to one order.
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([targetUserId])
 }

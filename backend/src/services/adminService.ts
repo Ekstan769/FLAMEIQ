@@ -2,13 +2,6 @@ import type { Request, Response } from "express";
 import { prisma } from "../db/prisma.js";
 import { logger } from "../utils/logger.js";
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role?: string;
-  };
-}
-
 /**
  * Fetches all registered users from the database.
  * Passwords are automatically excluded for security.
@@ -37,19 +30,19 @@ export const getAllUsers = async () => {
   }
 };
 
-export const adminDeleteUser = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
-  const { id } = req.params;
-  const targetUserId = parseInt(id as string, 10);
-
-  if (isNaN(targetUserId)) {
-    return res.status(400).json({ success: false, message: "Invalid user ID format." });
-  }
+export const adminDeleteUser = async (req: Request, res: Response): Promise<Response> => {
+  const { id: targetUserId } = req.params;
 
   if (!req.user?.id) {
     return res.status(401).json({ success: false, message: "Unauthorized access." });
   }
 
-  if (targetUserId === Number(req.user.id)) {
+  // Security: Ensure the user performing the action is an admin.
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ success: false, message: "Forbidden: You do not have permission to perform this action." });
+  }
+
+  if (targetUserId === req.user.id) {
     return res.status(400).json({ success: false, message: "You cannot delete your own account through this endpoint." });
   }
 
@@ -70,12 +63,12 @@ export const adminDeleteUser = async (req: AuthenticatedRequest, res: Response):
   }
 };
 
-export const selfDeleteUser = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
+export const selfDeleteUser = async (req: Request, res: Response): Promise<Response> => {
   if (!req.user?.id) {
     return res.status(401).json({ success: false, message: "Unauthorized access." });
   }
 
-  const targetUserId = Number(req.user.id);
+  const targetUserId = req.user.id;
 
   try {
     const result = await prisma.user.updateMany({
