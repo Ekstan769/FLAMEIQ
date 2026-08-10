@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Shield,
@@ -7,8 +11,18 @@ import {
   ArrowUpRight,
   Flame,
 } from "lucide-react";
+import RoleSelectionModal from "@/components/auth/RoleSelectionModal";
+import type { Portal } from "@/types/portal";
 
 export default function WelcomePage() {
+  const router = useRouter();
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+
+  const handleContinue = (role: Portal) => {
+    setIsRoleModalOpen(false);
+    router.push(`/signup?role=${role}`);
+  };
+
   return (
     <main className="min-h-screen bg-white">
       {/* Header */}
@@ -27,12 +41,13 @@ export default function WelcomePage() {
             Sign In
           </Link>
 
-          <Link
-            href="/signup"
+          <button
+            type="button"
+            onClick={() => setIsRoleModalOpen(true)}
             className="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
           >
             Get Started
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -88,13 +103,14 @@ export default function WelcomePage() {
 
           {/* Buttons */}
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link
-              href="/signup"
+            <button
+              type="button"
+              onClick={() => setIsRoleModalOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
             >
               Get Started
               <ArrowUpRight size={16} />
-            </Link>
+            </button>
 
             <Link
               href="#features"
@@ -166,6 +182,12 @@ export default function WelcomePage() {
           </p>
         </div>
       </section>
+
+      <RoleSelectionModal
+        isOpen={isRoleModalOpen}
+        onClose={() => setIsRoleModalOpen(false)}
+        onContinue={handleContinue}
+      />
     </main>
   );
 }
