@@ -9,28 +9,54 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id             Int              @id @default(autoincrement())
-  name           String
-  email          String           @unique
-  password       String
-  role           Role             @default(USER)
-  address        String?
-  deletedAt      DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+enum TxType {
+  DEPOSIT
+  WITHDRAWAL
+  PAYMENT
+  REFUND
+}
 
-  orders         Order[]
-  notifications  Notification[]
-  gasPredictions GasPrediction[]
-  supportTickets SupportTicket[]
-  loginHistories LoginHistory[]
-  wallet         Wallet?
+enum TxStatus {
+  PENDING
+  SUCCESS
+  FAILED
 }
 
 enum Role {
   USER
   ADMIN
+}
+
+enum ProfileType {
+  USER
+  VENDOR
+  ADMIN
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  role      Role      @default(USER)
+  address   String?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  profile          Profile[]
+  notifications    Notification[]
+  gasPredictions   GasPrediction[]
+  supportTickets   SupportTicket[]
+  loginHistories   LoginHistory[]
+  transactions     Transaction[]
+  otpVerifications OtpVerification[]
 }
 
 model Profile {
@@ -51,18 +77,13 @@ model Profile {
   deletedAt    DateTime?
 }
 
-enum ProfileType {
-  USER
-  VENDOR
-}
-
 // - OTP Verification -
 model OtpVerification {
   id        Int       @id @default(autoincrement())
   userId    Int
   user      User      @relation(fields: [userId], references: [id])
-  codeHash  String    
-  purpose   String    // "REGISTRATION", "LOGIN", "PASSWORD_RESET"
+  codeHash  String
+  purpose   String // "REGISTRATION", "LOGIN", "PASSWORD_RESET"
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
@@ -96,12 +117,6 @@ model SupportTicket {
   createdAt DateTime     @default(now())
 }
 
-enum TicketStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-}
-
 model LoginHistory {
   id        Int      @id @default(autoincrement())
   userId    Int
@@ -111,44 +126,14 @@ model LoginHistory {
   createdAt DateTime @default(now())
 }
 
-model Wallet {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @unique
-  user      User     @relation(fields: [userId], references: [id])
-  balance   Float    @default(0.0)
-  currency  String   @default("NGN") // Defaulting to Naira since in Africa, could be adjusted
-  status    WalletStatus @default(ACTIVE)
-  
-  transactions Transaction[]
-}
-
-enum WalletStatus {
-  ACTIVE
-  FROZEN
-  CLOSED
-}
-
 model Transaction {
   id          Int      @id @default(autoincrement())
-  walletId    Int
-  wallet      Wallet   @relation(fields: [walletId], references: [id])
   amount      Float
   type        TxType
   status      TxStatus
   reference   String   @unique
   description String?
   createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id])
+  userId      Int?
 }
-
-enum TxType {
-  DEPOSIT
-  WITHDRAWAL
-  PAYMENT
-  REFUND
-}
-
-enum TxStatus {
-  PENDING
-  SUCCESS
-  FAILED
-}
