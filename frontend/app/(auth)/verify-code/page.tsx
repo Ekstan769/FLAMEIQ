@@ -7,6 +7,7 @@ import OtpInput from "@/components/ui/OtpInput";
 import AuthIconBadge from "@/components/ui/AuthIconBadge";
 import AuthScreenHeader from "@/components/layout/AuthScreenHeader";
 import { verifyResetCode, sendPasswordReset } from "@/services/authService";
+import SuccessModal from "@/components/modals/SuccessModal";
 
 function VerifyCodeContent() {
   const router = useRouter();
@@ -16,7 +17,7 @@ function VerifyCodeContent() {
   const [code, setCode] = useState(["", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
+  const [verified, setVerified] = useState(false);
   const isComplete = code.every((digit) => digit !== "");
 
   const handleSubmit = async (e: FormEvent) => {
@@ -27,9 +28,7 @@ function VerifyCodeContent() {
     try {
       const joinedCode = code.join("");
       await verifyResetCode({ email, code: joinedCode });
-      router.push(
-        `/reset-password?email=${encodeURIComponent(email)}&code=${joinedCode}`
-      );
+      setVerified(true);
     } catch {
       setError("Invalid code. Please check and try again.");
     } finally {
@@ -93,6 +92,13 @@ function VerifyCodeContent() {
           <Mail size={16} /> Open Email App
         </button>
       </form>
+
+
+      <SuccessModal
+        isOpen={verified}
+        message="You're now ready to explore FlameIQ!"
+        redirectTo="/login"
+      />
     </div>
   );
 }
