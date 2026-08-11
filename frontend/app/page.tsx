@@ -82,14 +82,6 @@ export default function WelcomePage() {
             Smart Gas Delivery
           </span>
 
-          {/* Heading */}
-          <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
-            <span className="text-ink-500">
-              Smart Gas.
-              <br />
-              Delivered Before
-              <br />
-            </span>
 
             <span className="text-link-500">You Need It.</span>
           </h1>
@@ -166,15 +158,7 @@ export default function WelcomePage() {
               </p>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Features section anchor */}
-      <section id="features" className="px-6 py-16 md:px-12">
-        <div className="mx-auto max-w-7xl">
-          <h2 className="font-heading text-3xl font-bold text-ink-500">
-            Smarter Gas Management
-          </h2>
+        
 
           <p className="mt-3 max-w-2xl text-muted-500">
             FlameIQ helps households monitor their gas usage, predict refills,
