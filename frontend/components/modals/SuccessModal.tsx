@@ -6,7 +6,7 @@ import { useRouter } from "next/dist/client/components/navigation";
 
 export default function SuccessModal({
   isOpen,
-  title = "Successful ",
+  title = "Successful🎉",
   message,
   redirectTo,
   icon,
