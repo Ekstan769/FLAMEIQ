@@ -7,7 +7,7 @@ export default function SignupPage() {
       {/* Header */}
       <header className="signup-header">
         <Link href="/" className="logo">
-          🔥 Flame<strong>IQ</strong>
+           Flame<strong>IQ</strong>
         </Link>
 
         <div className="login-link">
