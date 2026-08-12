@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import type { Portal } from "@/types/portal";
 
-const NAV_ITEMS: Record
+const NAV_ITEMS: Record<
   Portal,
   { path: string; label: string; icon: React.ElementType }[]
 > = {

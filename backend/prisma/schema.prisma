@@ -20,12 +20,25 @@ model User {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  profile        Profile?
   orders         Order[]
   notifications  Notification[]
   gasPredictions GasPrediction[]
   supportTickets SupportTicket[]
   loginHistories LoginHistory[]
+  otpVerifications OtpVerification[]
   wallet         Wallet?
+}
+
+model Order {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  totalAmount Float    @default(0.0)
+  status      String   @default("pending")
+  type        String   @default("standard")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 enum Role {

@@ -72,7 +72,7 @@ class OrderService {
   }
 
   private notifyVendor(order: Order) {
-    notificationService.sendToClients([order.vendorId], {
+    notificationService.broadcast({
       title: 'New Order Received',
       message: `You have a new ${order.type} order! Total: $${order.totalAmount}`,
       type: 'info'
@@ -144,7 +144,7 @@ class OrderService {
     this.orders.set(orderId, order);
 
     // Notify user that it's on route
-    notificationService.sendToClients([order.userId], {
+    notificationService.broadcast({
       title: 'Order Accepted',
       message: 'Your order is on route!',
       type: 'success'

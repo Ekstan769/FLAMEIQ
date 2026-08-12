@@ -44,11 +44,14 @@ export const authenticate = (req: AuthenticatedRequest, res: Response, next: Nex
 };
 
 export const signUp = async(req: Request, res: Response) => {
-    const { name, email, password } = req.body
-
     try {
+        if (!req.body || typeof req.body !== 'object') {
+          return res.status(400).json({ success: false, message: "Invalid request body" });
+        }
+        const { name, email, password } = req.body;
+
         if (!name || !email || !password) {
-            return res.status(400).json({ message: "All fields required" });
+            return res.status(400).json({ success: false, message: "All fields (name, email, password) are required" });
         }
 
         const normalizedEmail = String(email).toLowerCase();
@@ -77,16 +80,20 @@ export const signUp = async(req: Request, res: Response) => {
           },
         });
 
-        const clientIp = (req as any).clientIp || '0.0.0.0';
-        const userAgent = req.headers['user-agent'] || 'unknown';
-        await prisma.loginHistory.create({
-          data: {
-            userId: user.id,
-            ipAddress: clientIp,
-            userAgent: userAgent
-          }
-        });
-        logger.info(`User ${user.email} signed up from IP ${clientIp}`);
+        try {
+          const clientIp = (req as any).clientIp || '0.0.0.0';
+          const userAgent = req.headers['user-agent'] || 'unknown';
+          await prisma.loginHistory.create({
+            data: {
+              userId: user.id,
+              ipAddress: clientIp,
+              userAgent: userAgent
+            }
+          });
+          logger.info(`User ${user.email} signed up from IP ${clientIp}`);
+        } catch (histErr) {
+          logger.warn(`Could not save login history for ${user.email}`);
+        }
 
         const payload = {
           id: Number(user.id),
@@ -96,7 +103,7 @@ export const signUp = async(req: Request, res: Response) => {
 
         const token = jwt.sign(
           payload,
-          process.env.JWT_SECRET as string,
+          process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026",
           {
             expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any
           }
@@ -108,12 +115,13 @@ export const signUp = async(req: Request, res: Response) => {
           token,
           user,
         });
-    } catch (error) {
-        logger.error({ err: error }, "Sign-up process failed unexpectedly");
+    } catch (error: any) {
+        console.error("SignUp Error Stack:", error?.stack || error);
+        logger.error({ message: error?.message, stack: error?.stack }, "Sign-up process failed unexpectedly");
 
         return res.status(500).json({
           success: false,
-          message: "Unexpected error sign up failed."
+          message: error?.message || "Unexpected error sign up failed."
         });
     }
 }
