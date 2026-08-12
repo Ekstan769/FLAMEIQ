@@ -1,8 +1,28 @@
-﻿import Link from "next/link";
-import image from "next/image";
-import {Shield,Zap,CheckCircle2, Star,ArrowUpRight,Flame,} from "lucide-react";
+﻿"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  Shield,
+  Zap,
+  CheckCircle2,
+  Star,
+  ArrowUpRight,
+  Flame,
+} from "lucide-react";
+import RoleSelectionModal from "@/components/auth/RoleSelectionModal";
+import type { Portal } from "@/types/portal";
 
 export default function WelcomePage() {
+  const router = useRouter();
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+
+  const handleContinue = (role: Portal) => {
+    setIsRoleModalOpen(false);
+    router.push(`/signup?role=${role}`);
+  };
+
   return (
     <main className="min-h-screen bg-white">
       <header className="flex items-center justify-between px-6 py-5 md:px-12">
@@ -18,12 +38,13 @@ export default function WelcomePage() {
             Sign In
           </Link>
 
-          <Link
-            href="/signup"
+          <button
+            type="button"
+            onClick={() => setIsRoleModalOpen(true)}
             className="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
           >
             Get Started
-          </Link>
+          </button>
         </div>
       </header>
 
@@ -70,13 +91,14 @@ export default function WelcomePage() {
           </p>
 
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link
-              href="/signup"
+            <button
+              type="button"
+              onClick={() => setIsRoleModalOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
             >
               Get Started
               <ArrowUpRight size={16} />
-            </Link>
+            </button>
 
             <Link
               href="#features"
@@ -132,19 +154,12 @@ export default function WelcomePage() {
           </div>
         </div>
       </section>
-      
-      <section>
-        {/* <div className="mx-auto max-w-7xl">
-          <h2 className="font-heading text-3xl font-bold text-ink-500">
-            Smarter Gas Management
-          </h2>
 
-          {/* <p className="mt-3 max-w-2xl text-muted-500">
-            FlameIQ helps households monitor their gas usage, predict refills,
-            and connect with trusted vendors.
-          </p> */}
-        {/* </div> */} 
-      </section>
+      <RoleSelectionModal
+        isOpen={isRoleModalOpen}
+        onClose={() => setIsRoleModalOpen(false)}
+        onContinue={handleContinue}
+      />
     </main>
   );
 }

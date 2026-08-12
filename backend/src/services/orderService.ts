@@ -1,125 +1,89 @@
+import { Order, OrderItem, OrderStatus, OrderType, Prisma } from '@prisma/client';
+import { prisma } from '../db/prisma.js';
 import { notificationService } from './notificationService.js';
+import { logger } from '../utils/logger.js';
 
-export interface OrderItem {
-  name: string;
-  quantity: number;
-  price: number;
-}
-
-export type OrderStatus = 'pending' | 'accepted' | 'on_route' | 'cancelled' | 'delivered';
-export type OrderType = 'standard' | 'quick';
-
-export interface Order {
-  id: string;
-  userId: string;
-  vendorId: string;
-  items: OrderItem[];
-  status: OrderStatus;
-  type: OrderType;
-  createdAt: string;
-  totalAmount: number;
-  delayTimerId?: NodeJS.Timeout;
-}
+// Use a type for creation that doesn't require all Order fields
+type OrderItemCreateInput = Omit<OrderItem, 'id' | 'orderId'>;
 
 class OrderService {
-  private orders: Map<string, Order> = new Map();
-  // 10 minutes delay in milliseconds
-  private readonly DELAY_MS = 10 * 60 * 1000;
-
   /**
    * Creates a new order.
-   * Standard orders wait 10 mins before notifying the vendor.
-   * Quick orders notify immediately.
+   * Notifies the vendor immediately.
+   * NOTE: In a full production system, delayed notifications for 'STANDARD' orders
+   * should be handled by a separate, persistent job queue (e.g., BullMQ with Redis)
+   * instead of `setTimeout` to guarantee execution.
    */
-  public createOrder(userId: string, vendorId: string, items: OrderItem[], type: OrderType): Order {
-    const orderId = `ord_${Date.now()}`;
-    const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  public async createOrder(userId: string, vendorId: string, items: OrderItemCreateInput[], type: OrderType): Promise<Order> {
+    const totalAmount = items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
 
-    const order: Order = {
-      id: orderId,
-      userId,
-      vendorId,
-      items,
-      status: 'pending',
-      type,
-      createdAt: new Date().toISOString(),
-      totalAmount,
-    };
+    try {
+      const order = await prisma.order.create({
+        data: {
+          userId,
+          vendorId,
+          type,
+          totalAmount,
+          items: {
+            create: items,
+          },
+        },
+        include: { items: true },
+      });
 
-    if (type === 'standard') {
-      // Set 10 min delay before notifying vendor
-      const timerId = setTimeout(() => {
-        this.notifyVendor(order);
-        // Clean up timer ID after it runs
-        const updatedOrder = this.orders.get(orderId);
-        if (updatedOrder) {
-          updatedOrder.delayTimerId = undefined;
-          this.orders.set(orderId, updatedOrder);
-        }
-      }, this.DELAY_MS);
-      
-      order.delayTimerId = timerId;
-    }
-
-    this.orders.set(orderId, order);
-
-    if (type === 'quick') {
-      // Notify immediately
+      // For both QUICK and STANDARD, we notify immediately.
+      // A job queue would be needed for delayed 'STANDARD' notifications.
       this.notifyVendor(order);
-    }
 
-    return { ...order, delayTimerId: undefined }; // Return without internal timer id
+      return order;
+    } catch (error) {
+      logger.error({ err: error }, 'Failed to create order in database');
+      throw new Error('Database operation failed during order creation.');
+    }
   }
 
-  private notifyVendor(order: Order) {
+  private notifyVendor(order: Order & { items: OrderItem[] }) {
     notificationService.sendToClients([order.vendorId], {
       title: 'New Order Received',
-      message: `You have a new ${order.type} order! Total: $${order.totalAmount}`,
+      message: `You have a new ${order.type.toLowerCase()} order! Total: $${order.totalAmount.toFixed(2)}`,
       type: 'info'
     });
   }
 
   /**
-   * User cancels their order.
+   * User cancels their pending order.
    */
-  public cancelOrder(orderId: string, userId: string): Order {
-    const order = this.orders.get(orderId);
-    
+  public async cancelOrder(orderId: string, userId: string): Promise<Order> {
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+
     if (!order) {
       throw new Error('Order not found');
     }
-    
+
     if (order.userId !== userId) {
       throw new Error('Unauthorized');
     }
 
-    if (order.type === 'quick') {
+    if (order.type === 'QUICK') {
       throw new Error('Quick orders cannot be cancelled');
     }
 
-    if (order.status !== 'pending') {
+    if (order.status !== 'PENDING') {
       throw new Error('Order can no longer be cancelled');
     }
 
-    // It is a standard order and still pending. 
-    // Clear the timer so vendor never gets notified.
-    if (order.delayTimerId) {
-      clearTimeout(order.delayTimerId);
-      order.delayTimerId = undefined;
-    }
-
-    order.status = 'cancelled';
-    this.orders.set(orderId, order);
-
-    return { ...order, delayTimerId: undefined };
+    return prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'CANCELLED' },
+    });
   }
 
   /**
    * Vendor accepts the order.
    */
-  public acceptOrder(orderId: string, vendorId: string): Order {
-    const order = this.orders.get(orderId);
-    
+  public async acceptOrder(orderId: string, vendorId: string): Promise<Order> {
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+
     if (!order) {
       throw new Error('Order not found');
     }
@@ -128,20 +92,14 @@ class OrderService {
       throw new Error('Unauthorized');
     }
 
-    if (order.status !== 'pending') {
+    if (order.status !== 'PENDING') {
       throw new Error(`Cannot accept order with status: ${order.status}`);
     }
 
-    // Update status to on_route
-    order.status = 'on_route';
-    
-    // Clear timer just in case
-    if (order.delayTimerId) {
-      clearTimeout(order.delayTimerId);
-      order.delayTimerId = undefined;
-    }
-
-    this.orders.set(orderId, order);
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'ON_ROUTE' },
+    });
 
     // Notify user that it's on route
     notificationService.sendToClients([order.userId], {
@@ -150,27 +108,34 @@ class OrderService {
       type: 'success'
     });
 
-    return { ...order, delayTimerId: undefined };
+    return updatedOrder;
   }
 
   /**
    * Get active orders for a user
    */
-  public getActiveOrders(userId: string): Order[] {
-    const allOrders = Array.from(this.orders.values());
-    return allOrders
-      .filter(o => o.userId === userId && o.status !== 'cancelled' && o.status !== 'delivered')
-      .map(o => ({ ...o, delayTimerId: undefined }));
+  public async getActiveOrders(userId: string): Promise<Order[]> {
+    return prisma.order.findMany({
+      where: {
+        userId,
+        status: {
+          notIn: ['CANCELLED', 'DELIVERED'],
+        },
+      },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   /**
    * Get all order history for a user
    */
-  public getOrderHistory(userId: string): Order[] {
-    const allOrders = Array.from(this.orders.values());
-    return allOrders
-      .filter(o => o.userId === userId)
-      .map(o => ({ ...o, delayTimerId: undefined }));
+  public async getOrderHistory(userId:string): Promise<Order[]> {
+    return prisma.order.findMany({
+      where: { userId },
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 }
 

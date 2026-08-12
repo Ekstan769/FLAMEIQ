@@ -1,7 +1,70 @@
-import "./signup.css";
+"use client";
+
+import { useState, FormEvent, ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import {
+  UserRound,
+  Mail,
+  LockKeyhole,
+  Eye,
+  EyeOff,
+  Apple,
+} from "lucide-react";
+import { signup as signupRequest } from "@/services/authService";
+import { useAuth } from "@/context/AuthContext";
+
+import "./signup.css";
 
 export default function SignupPage() {
+  const router = useRouter();
+  const { login } = useAuth();
+
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleChange =
+    (field: keyof typeof form) => (e: ChangeEvent<HTMLInputElement>) =>
+      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (!agreedToTerms) {
+      setError("You must agree to the Terms & Conditions to continue.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await signupRequest({
+        name: form.fullName,
+        email: form.email,
+        password: form.password,
+      });
+      login(data.user, data.token);
+      router.push("/customer/dashboard");
+    } catch {
+      setError("Sign up failed. Please check your details and try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <main className="signup-page">
       {/* Header */}

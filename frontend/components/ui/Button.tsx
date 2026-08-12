@@ -12,11 +12,11 @@ export default function Button({
   type = "button",
   disabled = false,
   onClick,
-  className = "",
+  className="",
 }: {
   children: React.ReactNode;
   variant?: ButtonVariant;
-  type?: "button" | "submit";
+  type?: "button" | "submit" | "reset";
   disabled?: boolean;
   onClick?: () => void;
   className?: string;
@@ -26,7 +26,7 @@ export default function Button({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${VARIANT_CLASSES[variant]} ${className}`}
+      className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${VARIANT_CLASSES[variant]} ${className ?? ""}`.trim()}
     >
       {children}
     </button>

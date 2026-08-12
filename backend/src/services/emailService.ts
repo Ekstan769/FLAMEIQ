@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config/index.js';
+import { logger } from '../utils/logger.js';
 
 class EmailService {
   private transporter: nodemailer.Transporter;
@@ -24,8 +25,7 @@ class EmailService {
   public async sendEmail(to: string, subject: string, text: string, html?: string): Promise<boolean> {
     try {
       if (!config.email.user || !config.email.pass) {
-        // eslint-disable-next-line no-console
-        console.warn('Email config missing! Using mock sender... (Add SMTP credentials to .env)');
+        logger.warn('Email config missing! Using mock sender. Add SMTP credentials to .env');
         return true;
       }
 
@@ -37,12 +37,10 @@ class EmailService {
         html,
       });
 
-      // eslint-disable-next-line no-console
-      console.log('Message sent: %s', info.messageId);
+      logger.info(`Message sent: ${info.messageId}`);
       return true;
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Error sending email:', error);
+      logger.error({ err: error }, 'Error sending email');
       // We log but don't strictly crash the app because non-blocking design is requested
       return false; 
     }
