@@ -1,22 +1,24 @@
 "use client";
 
 import { useState, FormEvent, ChangeEvent } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
+import Link from "next/link";
 import { signup as signupRequest } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 
-export default function SignUpPage() {
+import "./signup.css";
+
+export default function SignupPage() {
   const router = useRouter();
   const { login } = useAuth();
+
   const [form, setForm] = useState({
-    name: "",
+    fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +30,7 @@ export default function SignUpPage() {
     e.preventDefault();
     setError("");
 
-    if (!form.name.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
+    if (!form.fullName.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
       setError("Please fill in all fields.");
       return;
     }
@@ -43,20 +45,29 @@ export default function SignUpPage() {
       return;
     }
 
+    if (!agreedToTerms) {
+      setError("You must agree to the Terms & Conditions to continue.");
+      return;
+    }
+
     setLoading(true);
     try {
       const { data } = await signupRequest({
-        name: form.name.trim(),
+        name: form.fullName.trim(),
         email: form.email.trim(),
         password: form.password,
       });
 
-      login(data.user, data.token);
-      const targetRoute = data.user?.role === "VENDOR" ? "/vendor/dashboard" : "/customer/dashboard";
-      router.push(targetRoute);
+      if (data?.user && data?.token) {
+        login(data.user, data.token);
+        const targetRoute = data.user?.role === "VENDOR" ? "/vendor/dashboard" : "/customer/dashboard";
+        router.push(targetRoute);
+      } else {
+        router.push("/login");
+      }
     } catch (err: any) {
       const message =
-        err?.response?.data?.message || "Sign up failed. Please try again.";
+        err?.response?.data?.message || "Sign up failed. Please check your details and try again.";
       setError(message);
     } finally {
       setLoading(false);
@@ -64,53 +75,143 @@ export default function SignUpPage() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Create an Account</h1>
-        <p className="text-sm text-slate-600 mt-1">Get started with FlameIQ today</p>
-      </div>
-
-      <Input
-        label="Full Name"
-        type="text"
-        value={form.name}
-        onChange={handleChange("name")}
-        placeholder="John Doe"
-      />
-      <Input
-        label="Email Address"
-        type="email"
-        value={form.email}
-        onChange={handleChange("email")}
-        placeholder="you@example.com"
-      />
-      <Input
-        label="Password"
-        type="password"
-        value={form.password}
-        onChange={handleChange("password")}
-        placeholder="••••••••"
-      />
-      <Input
-        label="Confirm Password"
-        type="password"
-        value={form.confirmPassword}
-        onChange={handleChange("confirmPassword")}
-        placeholder="••••••••"
-      />
-
-      {error && <p className="text-sm text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">{error}</p>}
-
-      <Button type="submit" disabled={loading}>
-        {loading ? "Creating account…" : "Sign Up"}
-      </Button>
-
-      <p className="text-center text-sm text-slate-600 mt-2">
-        Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-brand-500 hover:underline">
-          Log in
+    <main className="signup-page">
+      {/* Header */}
+      <header className="signup-header">
+        <Link href="/" className="logo">
+           Flame<strong>IQ</strong>
         </Link>
-      </p>
-    </form>
+
+        <div className="login-link">
+          <span>Already have an account?</span>
+
+          <Link href="/login">
+            Login
+          </Link>
+        </div>
+      </header>
+
+      {/* Signup Section */}
+      <section className="signup-section">
+        {/* Background Image */}
+        <div className="signup-background">
+          <img
+            src="/images/gas-phone.png"
+            alt="FlameIQ gas cylinder and mobile application"
+          />
+        </div>
+
+        {/* Form Overlay */}
+        <div className="signup-form-container">
+          {/* Signup Icon */}
+          <div className="signup-icon">
+            ♙
+          </div>
+
+          {/* Heading */}
+          <h1>Create Your Account</h1>
+
+          <p>
+            Input your details to create a new account.
+          </p>
+
+          {/* Signup Form */}
+          <form onSubmit={handleSubmit}>
+            {/* Full Name */}
+            <div className="form-group">
+              <label htmlFor="fullName">
+                Full Name
+              </label>
+
+              <input
+                id="fullName"
+                name="fullName"
+                type="text"
+                placeholder="Enter your full name"
+                value={form.fullName}
+                onChange={handleChange("fullName")}
+              />
+            </div>
+
+            {/* Email */}
+            <div className="form-group">
+              <label htmlFor="email">
+                Email Address
+              </label>
+
+              <input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="Enter email address"
+                value={form.email}
+                onChange={handleChange("email")}
+              />
+            </div>
+
+            {/* Password */}
+            <div className="form-group">
+              <label htmlFor="password">
+                Create a New Password
+              </label>
+
+              <input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="Enter new password"
+                value={form.password}
+                onChange={handleChange("password")}
+              />
+            </div>
+
+            {/* Confirm Password */}
+            <div className="form-group">
+              <label htmlFor="confirmPassword">
+                Confirm New Password
+              </label>
+
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                placeholder="Re-type your password to confirm"
+                value={form.confirmPassword}
+                onChange={handleChange("confirmPassword")}
+              />
+            </div>
+
+            {/* Terms */}
+            <div className="terms">
+              <input
+                id="terms"
+                name="terms"
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+              />
+
+              <label htmlFor="terms">
+                I agree to the{" "}
+                <strong>Terms & Conditions</strong>{" "}
+                and{" "}
+                <strong>Privacy Policy</strong>.
+              </label>
+            </div>
+
+            {error && <p className="text-sm text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200 mt-2">{error}</p>}
+
+            {/* Button */}
+            <button
+              type="submit"
+              className="get-started"
+              disabled={loading}
+            >
+              {loading ? "Creating Account..." : "Get Started ↗"}
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
   );
 }

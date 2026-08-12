@@ -18,3 +18,4 @@ logs/
 Thumbs.db
 ehthumbs.db
 /src/generated/prisma
+logs

@@ -1,22 +1,16 @@
 import { NextFunction, Request, Response } from "express";
-import { prisma } from "../db/prisma.js";
 import bcrypt from "bcrypt";
-import * as adminService from '../services/adminService.js'
-import { logger } from '../utils/logger.js';
 import jwt from "jsonwebtoken";
+import { prisma } from "@/db/prisma.js";
+import * as adminService from '@/services/adminService.js'
+import { logger } from '@/utils/logger.js';
+import { generateOtp, getOtpExpiration, hashOtp } from "@/utils/otp.js";
+import { emailService } from "@/services/emailService.js";
 //import { uploadToCloudinary } from "../utils/upload";
 
 
 
-// Interface extension so TypeScript allows req.user and req.file
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    role?: string;
-  };
-}
-
-export const authenticate = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
 
   if (!header?.startsWith("Bearer ")) {
@@ -27,14 +21,14 @@ export const authenticate = (req: AuthenticatedRequest, res: Response, next: Nex
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
-      id?: string;
-      role?: string;
+      id: string;
+      role: string;
     };
 
     req.user = {
-      id: String(decoded.id ?? ""),
-      role: decoded.role,
-    };
+      id: decoded.id,
+      role: decoded.role as any,
+    } as any;
 
     return next();
   } catch (error) {
@@ -42,6 +36,17 @@ export const authenticate = (req: AuthenticatedRequest, res: Response, next: Nex
     return res.status(401).json({ success: false, message: "Invalid or expired token" });
   }
 };
+
+export const authorizeAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (req.user?.role !== 'ADMIN') {
+    return res.status(403).json({
+      success: false,
+      message: "Forbidden: Administrator access required.",
+    });
+  }
+  return next();
+};
+
 
 export const signUp = async(req: Request, res: Response) => {
     try {
@@ -51,7 +56,7 @@ export const signUp = async(req: Request, res: Response) => {
         const { name, email, password } = req.body;
 
         if (!name || !email || !password) {
-            return res.status(400).json({ success: false, message: "All fields (name, email, password) are required" });
+            return res.status(400).json({ message: "All fields required" });
         }
 
         const normalizedEmail = String(email).toLowerCase();
@@ -81,6 +86,30 @@ export const signUp = async(req: Request, res: Response) => {
         });
 
         try {
+          const otp = generateOtp();
+          const otpExpiresAt = getOtpExpiration();
+          const codeHash = await hashOtp(otp);
+
+          await prisma.otpVerification.create({
+            data: {
+              userId: user.id,
+              codeHash,
+              expiresAt: otpExpiresAt,
+              purpose: "REGISTRATION",
+            },
+          });
+
+          await emailService.sendEmail(
+            normalizedEmail,
+            "Your FLAMEIQ Verification Code",
+            `Welcome to FLAMEIQ! Your verification code is: ${otp}. It will expire in 10 minutes.`,
+            `<p>Welcome to FLAMEIQ! Your verification code is: <strong>${otp}</strong>. It will expire in 10 minutes.</p>`
+          );
+        } catch (otpErr) {
+          logger.warn(`OTP creation or email sending failed: ${otpErr}`);
+        }
+
+        try {
           const clientIp = (req as any).clientIp || '0.0.0.0';
           const userAgent = req.headers['user-agent'] || 'unknown';
           await prisma.loginHistory.create({
@@ -96,7 +125,7 @@ export const signUp = async(req: Request, res: Response) => {
         }
 
         const payload = {
-          id: Number(user.id),
+          id: user.id,
           email: String(user.email),
           role: String(user.role),
         };
@@ -111,9 +140,10 @@ export const signUp = async(req: Request, res: Response) => {
 
         return res.status(201).json({
           success: true,
-          message: "User created successfully",
+          message: "User created successfully. Please check your email for the verification code.",
           token,
           user,
+          userId: user.id,
         });
     } catch (error: any) {
         console.error("SignUp Error Stack:", error?.stack || error);
@@ -121,11 +151,96 @@ export const signUp = async(req: Request, res: Response) => {
 
         return res.status(500).json({
           success: false,
-          message: error?.message || "Unexpected error sign up failed."
+          message: "Unexpected error sign up failed."
         });
     }
 }
 
+export const verifyOtp = async (req: Request, res: Response) => {
+  const { userId, otp } = req.body;
+
+  try {
+    if (!userId || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID and OTP are required.",
+      });
+    }
+
+    // Find the latest valid OTP for the user and purpose
+    const otpRecord = await prisma.otpVerification.findFirst({
+      where: {
+        userId: userId,
+        purpose: "REGISTRATION",
+        usedAt: null, // Not yet used
+        expiresAt: {
+          gt: new Date(), // Not expired
+        },
+      },
+      orderBy: {
+        createdAt: 'desc', // Get the latest OTP
+      },
+    });
+
+    if (!otpRecord) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid OTP.",
+      });
+    }
+
+    // Compare the provided OTP with the stored hash
+    const isOtpValid = await bcrypt.compare(otp, otpRecord.codeHash);
+    if (!isOtpValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid OTP.",
+      });
+    }
+
+    if (otpRecord.expiresAt < new Date()) {
+      return res.status(401).json({
+        success: false,
+        message: "OTP has expired. Please request a new one.",
+      });
+    }
+
+    // OTP is valid, clear it and generate JWT
+    await prisma.otpVerification.update({
+      where: { id: otpRecord.id },
+      data: {
+        usedAt: new Date(),
+      },
+    });
+
+    // Fetch the user to return with the token
+    const user = await prisma.user.findUnique({
+      where: { id: userId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        profile: true,
+      },
+    });
+
+    if (!user) { // Should not happen if otpRecord was found, but for type safety
+      return res.status(404).json({ success: false, message: "User not found after OTP verification." });
+    }
+
+    const payload = {
+      id: user.id, email: user.email, role: user.role,
+    };
+    const secret = process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026";
+    const token = jwt.sign(payload, secret, { expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any });
+
+    return res.status(200).json({ success: true, message: "Account verified successfully.", token, user });
+  } catch (error) {
+    logger.error({ err: error }, "OTP verification failed unexpectedly");
+    return res.status(500).json({ success: false, message: "An unexpected error occurred during OTP verification." });
+  }
+};
 
 
 export const signIn = async (req: Request, res: Response) =>{
@@ -154,14 +269,14 @@ export const signIn = async (req: Request, res: Response) =>{
     }
     const PasswordValid = await bcrypt.compare(password, user.password);
     if(!PasswordValid){
-      logger.warn(`Failed login attempt for email ${email} from IP ${(req as any).clientIp}`);
+      logger.warn(`Failed login attempt for email ${email} from IP ${req.ip}`);
       return res.status(401).json({
         success: false,
         message: "Invalid email or password"
       });
     }
 
-    const clientIp = (req as any).clientIp || '0.0.0.0';
+    const clientIp = req.ip || '0.0.0.0';
     const userAgent = req.headers['user-agent'] || 'unknown';
     await prisma.loginHistory.create({
       data: {
@@ -175,18 +290,19 @@ export const signIn = async (req: Request, res: Response) =>{
 
     
    
-const payload = { 
-  id: Number(user.id),    
-  email: String(user.email),
-  role: String(user.role),
+const payload = {
+  id: user.id,
+  email: user.email,
+  role: user.role,
 };
 
 // 2. Pass the clean payload and cast the options
+const secret = process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026";
 const token = jwt.sign(
   payload, 
-  process.env.JWT_SECRET as string, 
+  secret, 
   { 
-    expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any // 'any' bypasses strict type checking for the option
+    expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any
   }
 );
 
@@ -234,35 +350,22 @@ export const getUsers = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteUsers = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    return await adminService.adminDeleteUser(req, res);
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch users"
-    });
-  }
+export const deleteUsers = async (req: Request, res: Response) => {
+  // The service function handles the response, so no try/catch is needed here.
+  return adminService.adminDeleteUser(req, res);
 };
 
-export const deleteSelf = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    return await adminService.selfDeleteUser(req, res);
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to delete your account"
-    });
-  }
+export const deleteSelf = async (req: Request, res: Response) => {
+  // The service function handles the response.
+  return adminService.selfDeleteUser(req, res);
 };
-
-export const updateProfile = async (req: AuthenticatedRequest, res: Response) => {
+export const updateProfile = async (req: Request, res: Response) => {
   try {
     if (!req.user?.id) {
       return res.status(401).json({ success: false, message: "Unauthorized access." });
     }
 
-    const userId = Number(req.user.id);
+    const userId = req.user.id;
     const { businessName, phone, address, isVendor, profilePic } = req.body;
 
     const existingProfile = await prisma.profile.findUnique({
@@ -303,5 +406,3 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
     return res.status(500).json({ success: false, message: "Failed to update profile" });
   }
 };
-
-

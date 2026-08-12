@@ -1,82 +1,175 @@
 "use client";
 
-import { useState, FormEvent, ChangeEvent } from "react";
+import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
-import { login as loginRequest } from "@/services/authService";
+import {
+  UserRound,
+  Mail,
+  LockKeyhole,
+  Eye,
+  EyeOff,
+  ArrowUpRight,
+} from "lucide-react";
+
+import "./login.css";
+import { login as loginUser } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
+
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleChange =
-    (field: "email" | "password") => (e: ChangeEvent<HTMLInputElement>) =>
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
     setError("");
 
-    if (!form.email.trim() || !form.password) {
-      setError("Please enter both email and password.");
+    if (!identifier.trim() || !password) {
+      setError("Please enter your email and password.");
       return;
     }
 
-    setLoading(true);
     try {
-      const { data } = await loginRequest(form);
-      login(data.user, data.token);
-      const targetRoute = data.user?.role === "VENDOR" ? "/vendor/dashboard" : "/customer/dashboard";
+      setLoading(true);
+
+      const response = await loginUser({
+        email: identifier,
+        password: password,
+      });
+
+      const data = response.data;
+
+      const user = data?.user;
+      const token = data?.token;
+
+      if (!user || !token) {
+        throw new Error("Invalid login response from server.");
+      }
+
+      login(user, token);
+      const targetRoute = user?.role === "VENDOR" ? "/vendor/dashboard" : "/customer/dashboard";
       router.push(targetRoute);
     } catch (err: any) {
-      const message =
-        err?.response?.data?.message || "Login failed. Check your details and try again.";
-      setError(message);
+      console.error("Login error:", err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Unable to login. Please check your details and try again."
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Welcome Back</h1>
-        <p className="text-sm text-slate-600 mt-1">Sign in to your FlameIQ account</p>
-      </div>
-
-      <Input
-        label="Email"
-        type="email"
-        value={form.email}
-        onChange={handleChange("email")}
-        placeholder="you@example.com"
-      />
-      <Input
-        label="Password"
-        type="password"
-        value={form.password}
-        onChange={handleChange("password")}
-        placeholder="••••••••"
-      />
-
-      {error && <p className="text-sm text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">{error}</p>}
-
-      <Button type="submit" disabled={loading}>
-        {loading ? "Logging in…" : "Log in"}
-      </Button>
-
-      <p className="text-center text-sm text-slate-600 mt-2">
-        Don't have an account?{" "}
-        <Link href="/signup" className="font-semibold text-brand-500 hover:underline">
-          Sign up
+    <main className="login-page">
+      <header className="auth-header">
+        <Link href="/" className="flameiq-logo">
+          <span className="logo-flame">♨</span>
+          <span>Flame</span>
+          <strong>IQ</strong>
         </Link>
-      </p>
-    </form>
+
+        <div className="auth-header-right">
+          <span>Don&apos;t have an account?</span>
+
+          <Link href="/signup" className="signup-link">
+            Sign Up
+          </Link>
+        </div>
+      </header>
+
+      <section className="login-container">
+        <div className="login-card">
+          <div className="login-icon">
+            <UserRound size={27} strokeWidth={1.8} />
+          </div>
+
+          <div className="login-heading">
+            <h1>Welcome Back 👋</h1>
+            <p>Enter your details to access your FlameIQ account.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="login-form">
+            <div className="form-group">
+              <label htmlFor="identifier">Email Address or Phone number</label>
+
+              <div className="input-wrapper">
+                <Mail size={20} className="input-icon" />
+
+                <input
+                  id="identifier"
+                  type="text"
+                  placeholder="Enter email address or phone number"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+
+              <div className="input-wrapper">
+                <LockKeyhole size={20} className="input-icon" />
+
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="login-options">
+              <label className="remember-me">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(event) => setRememberMe(event.target.checked)}
+                />
+
+                <span>Remember me</span>
+              </label>
+
+              <Link href="/forgot-password">Forgot Password?</Link>
+            </div>
+
+            {error && <p className="login-error">{error}</p>}
+
+            <button type="submit" className="login-button" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
+
+              {!loading && <ArrowUpRight size={20} />}
+            </button>
+          </form>
+
+          <p className="create-account">
+            Don&apos;t have a FlameIQ account?{" "}
+            <Link href="/signup">Create Account</Link>
+          </p>
+        </div>
+      </section>
+    </main>
   );
 }

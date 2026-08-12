@@ -48,7 +48,7 @@ importers:
         specifier: ^5.0.1
         version: 5.0.1(express@5.2.1)
       winston:
-        specifier: ^3.17.0
+        specifier: ^3.19.0
         version: 3.19.0
     devDependencies:
       '@eslint/js':
@@ -120,6 +120,9 @@ importers:
       vitest:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.43)
+      vitest-mock-extended:
+        specifier: ^1.3.2
+        version: 1.3.2(typescript@5.9.3)(vitest@1.6.1(@types/node@20.19.43))
 
 packages:
 
@@ -2664,6 +2667,14 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4'
 
+  ts-essentials@10.2.1:
+    resolution: {integrity: sha512-+Id1fRkuir+CsgK2x04/icS2b4V1hQmq7ObzIrDjhN0ozfRYivnP7aaKMVJfLApQm0trjR39A6NIMVchiB9Erw==}
+    peerDependencies:
+      typescript: '>=4.5.0'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   ts-node-dev@2.0.0:
     resolution: {integrity: sha512-ywMrhCfH6M75yftYvrvNarLEY+SUXtUvU8/0Z6llrHQVBx12GiFk5sStF8UdfE/yfzk9IAq7O5EEbTQsxlBI8w==}
     engines: {node: '>=0.8.0'}
@@ -2787,6 +2798,12 @@ packages:
         optional: true
       terser:
         optional: true
+
+  vitest-mock-extended@1.3.2:
+    resolution: {integrity: sha512-wnpym69MFYBUbUT6vrM/E4sF0bylow+N/RBBTZWn4rO/UFLusvuCrb3CMe3K4663+iBzplrhk0hQ2O246rFrqQ==}
+    peerDependencies:
+      typescript: 3.x || 4.x || 5.x
+      vitest: '>=2.0.0'
 
   vitest@1.6.1:
     resolution: {integrity: sha512-Ljb1cnSJSivGN0LqXd/zmDbWEM0RNNg2t1QW/XUhYl/qPqyu7CsqeWtqQXHVaJsecLPuDoak2oJcZN2QoRIOag==}
@@ -5384,6 +5401,10 @@ snapshots:
     dependencies:
       typescript: 5.9.3
 
+  ts-essentials@10.2.1(typescript@5.9.3):
+    optionalDependencies:
+      typescript: 5.9.3
+
   ts-node-dev@2.0.0(@types/node@20.19.43)(typescript@5.9.3):
     dependencies:
       chokidar: 3.6.0
@@ -5504,6 +5525,12 @@ snapshots:
     optionalDependencies:
       '@types/node': 20.19.43
       fsevents: 2.3.3
+
+  vitest-mock-extended@1.3.2(typescript@5.9.3)(vitest@1.6.1(@types/node@20.19.43)):
+    dependencies:
+      ts-essentials: 10.2.1(typescript@5.9.3)
+      typescript: 5.9.3
+      vitest: 1.6.1(@types/node@20.19.43)
 
   vitest@1.6.1(@types/node@20.19.43):
     dependencies:

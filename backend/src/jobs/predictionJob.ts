@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { config } from '../config/index.js';
 import { aiService } from '../services/aiService.js';
 import { notificationService } from '../services/notificationService.js';
+import { logger } from '../utils/logger.js';
 
 class PredictionJob {
   public start() {
@@ -9,14 +10,12 @@ class PredictionJob {
     cron.schedule('* * * * *', async () => {
       // 1. Off-switch for easy debugging or pausing
       if (!config.enableCronJob) {
-        // eslint-disable-next-line no-console
-        console.log('[Cron Job] Skipped - enableCronJob is false in config.');
+        logger.info('[Cron Job] Skipped - enableCronJob is false in config.');
         return;
       }
 
       try {
-        // eslint-disable-next-line no-console
-        console.log('[Cron Job] Running prediction task...');
+        logger.info('[Cron Job] Running prediction task...');
         
         // 2. Perform actions like querying AI Data (which increments counter)
         const prediction = await aiService.processPrediction({
@@ -33,8 +32,7 @@ class PredictionJob {
 
       } catch (error) {
         // 4. Non-blocking: Catch errors so the server doesn't crash if the cron fails
-        // eslint-disable-next-line no-console
-        console.error('[Cron Job] Error during execution:', error);
+        logger.error({ err: error }, '[Cron Job] Error during execution');
       }
     });
   }
