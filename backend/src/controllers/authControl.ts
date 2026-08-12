@@ -1,12 +1,11 @@
 import { NextFunction, Request, Response } from "express";
-import { prisma } from "../db/prisma.js";
 import bcrypt from "bcrypt";
-import * as adminService from '../services/adminService.js'
-import { logger } from '../utils/logger.js';
 import jwt from "jsonwebtoken";
-import { generateOtp, getOtpExpiration } from "../utils/otp.js";
-import { hashOtp } from "../utils/otp.js";
-import { emailService } from "../services/emailService.js";
+import { prisma } from "@/db/prisma.js";
+import * as adminService from '@/services/adminService.js'
+import { logger } from '@/utils/logger.js';
+import { generateOtp, getOtpExpiration, hashOtp } from "@/utils/otp.js";
+import { emailService } from "@/services/emailService.js";
 //import { uploadToCloudinary } from "../utils/upload";
 
 

@@ -6,25 +6,25 @@ import jwt from 'jsonwebtoken';
 import { Request, Response } from 'express';
 
 import { signUp, signIn, verifyOtp } from './authControl.js';
-import { emailService } from '../services/emailService.js';
+import { emailService } from '@/services/emailService.js';
 
 // Mock external dependencies
-vi.mock('../db/prisma.js', () => ({
+vi.mock('@/db/prisma.js', () => ({
   prisma: mockDeep<PrismaClient>(),
 }));
 vi.mock('bcrypt');
 vi.mock('jsonwebtoken');
-vi.mock('../utils/otp.js', () => ({
+vi.mock('@/utils/otp.js', () => ({
   hashOtp: vi.fn(() => 'hashedOtp123'), // Mock the new hashOtp function
   generateOtp: vi.fn(() => '123456'),
   getOtpExpiration: vi.fn(() => new Date(Date.now() + 10 * 60 * 1000)), // 10 minutes from now
 }));
-vi.mock('../services/emailService.js', () => ({
+vi.mock('@/services/emailService.js', () => ({
   emailService: {
     sendEmail: vi.fn(),
   },
 }));
-vi.mock('../utils/logger.js', () => ({
+vi.mock('@/utils/logger.js', () => ({
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('../utils/logger.js', () => ({
   },
 }));
 
-import { prisma } from '../db/prisma.js';
+import { prisma } from '@/db/prisma.js';
 
 const prismaMock = prisma as unknown as ReturnType<typeof mockDeep<PrismaClient>>;
 
