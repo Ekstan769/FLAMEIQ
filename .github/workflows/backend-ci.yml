@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+
   pull_request:
     branches:
       - main
@@ -17,26 +18,38 @@ jobs:
         node-version: ['^20.0']
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 11.20.0
+          run_install: false
+
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
-      - name: Install pnpm
-        run: corepack enable && corepack yarn pnpm@latest
+          cache-dependency-path: backend/pnpm-lock.yaml
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
         working-directory: backend
+
       - name: Generate Prisma client
         run: pnpm run prisma:generate
         working-directory: backend
+
       - name: Run lint
         run: pnpm run lint
         working-directory: backend
+
       - name: Run typecheck
         run: pnpm run typecheck
         working-directory: backend
+
       - name: Run tests
         run: pnpm run test
         working-directory: backend

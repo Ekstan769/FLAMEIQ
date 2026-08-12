@@ -1,3 +1,7 @@
+﻿"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Shield,
@@ -7,18 +11,25 @@ import {
   ArrowUpRight,
   Flame,
 } from "lucide-react";
+import RoleSelectionModal from "@/components/auth/RoleSelectionModal";
+import type { Portal } from "@/types/portal";
 
 export default function WelcomePage() {
+  const router = useRouter();
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+
+  const handleContinue = (role: Portal) => {
+    setIsRoleModalOpen(false);
+    router.push(`/signup?role=${role}`);
+  };
+
   return (
     <main className="min-h-screen bg-white">
-      {/* Header */}
       <header className="flex items-center justify-between px-6 py-5 md:px-12">
-        {/* Logo */}
         <Link href="/" className="text-2xl font-bold text-brand-500">
           Flame<span className="text-notify-500">IQ</span>
         </Link>
 
-        {/* Navigation */}
         <div className="flex items-center gap-3">
           <Link
             href="/login"
@@ -27,16 +38,16 @@ export default function WelcomePage() {
             Sign In
           </Link>
 
-          <Link
-            href="/signup"
+          <button
+            type="button"
+            onClick={() => setIsRoleModalOpen(true)}
             className="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
           >
             Get Started
-          </Link>
+          </button>
         </div>
       </header>
 
-      {/* Hero */}
       <section
         className="
           mx-auto
@@ -59,34 +70,35 @@ export default function WelcomePage() {
           md:bg-right
         "
       >
-        {/* Left: Copy */}
         <div className="max-w-xl">
-          {/* Badge */}
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-notify-50 px-3 py-1 text-xs font-semibold text-notify-700">
-            <Flame size={12} />
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1f4e79] px-3 py-1 text-xs font-semibold text-white">
+            <Flame size={12} className="text-white" />
             Smart Gas Delivery
           </span>
-
-
-            <span className="text-link-500">You Need It.</span>
+          <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
+            <span className="text-ink-500">
+              Smart Gas.
+              <br />
+              Delivered Before
+              <br />
+            </span>
+            <span className="text-[#1f4e79]">You Need It.</span>
           </h1>
-
-          {/* Description */}
           <p className="mt-5 text-[15px] leading-relaxed text-muted-500">
             Monitor your gas level in real time, get smart refill
             predictions, order from trusted vendors and enjoy fast
             delivery right to your doorstep.
           </p>
 
-          {/* Buttons */}
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link
-              href="/signup"
+            <button
+              type="button"
+              onClick={() => setIsRoleModalOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
             >
               Get Started
               <ArrowUpRight size={16} />
-            </Link>
+            </button>
 
             <Link
               href="#features"
@@ -96,7 +108,6 @@ export default function WelcomePage() {
             </Link>
           </div>
 
-          {/* Trust badges */}
           <div className="mt-6 flex flex-wrap gap-2 text-xs font-medium text-muted-500">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5">
               <Shield size={14} className="text-brand-500" />
@@ -114,7 +125,6 @@ export default function WelcomePage() {
             </span>
           </div>
 
-          {/* Rating */}
           <div className="mt-6 flex items-center gap-3">
             <div className="flex -space-x-2">
               {[0, 1, 2, 3, 4].map((i) => (
@@ -142,14 +152,14 @@ export default function WelcomePage() {
               </p>
             </div>
           </div>
-        
-
-          <p className="mt-3 max-w-2xl text-muted-500">
-            FlameIQ helps households monitor their gas usage, predict refills,
-            and connect with trusted vendors.
-          </p>
         </div>
       </section>
+
+      <RoleSelectionModal
+        isOpen={isRoleModalOpen}
+        onClose={() => setIsRoleModalOpen(false)}
+        onContinue={handleContinue}
+      />
     </main>
   );
 }

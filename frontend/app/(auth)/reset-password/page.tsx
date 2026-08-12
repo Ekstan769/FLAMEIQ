@@ -2,12 +2,13 @@
 
 import { Suspense, useState, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, CheckCircle2 } from "lucide-react";
+import { Lock } from "lucide-react";
 import Input from "@/components/ui/Input";
 import AuthIconBadge from "@/components/ui/AuthIconBadge";
 import Button from "@/components/ui/Button";
 import AuthScreenHeader from "@/components/layout/AuthScreenHeader";
 import { resetPassword } from "@/services/authService";
+import SuccessModal from "@/components/modals/SuccessModal";
 
 function ResetPasswordContent() {
   const router = useRouter();
@@ -86,28 +87,12 @@ function ResetPasswordContent() {
         </Button>
       </form>
 
-      {/* Success modal overlay */}
-      {success && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-500/60 p-6">
-          <div className="w-full max-w-xs rounded-2xl bg-white p-6 text-center shadow-lg">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
-              <CheckCircle2 size={26} className="text-success" />
-            </div>
-            <h2 className="font-heading mt-4 text-lg font-bold text-ink-500">
-              Successful 🎉
-            </h2>
-            <p className="mt-2 text-sm text-muted-500">
-              You have successfully changed your password.
-            </p>
-            <button
-              onClick={() => router.push("/login")}
-              className="mt-6 w-full rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover"
-            >
-              Continue to Login
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Success modal Message overlay */}
+      <SuccessModal
+        isOpen={success}
+        message="You have successfully changed your password."
+        redirectTo="/login"
+      />
     </div>
   );
 }

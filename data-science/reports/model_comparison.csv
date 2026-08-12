@@ -1,0 +1,13 @@
+Pathway,Model,MAE_days,RMSE_days,R2,Within_2_days_pct,Within_5_days_pct,Late_prediction_pct
+Cold Start,Lasso,4.575,6.021,0.748,31.75,65.08,54.76
+Cold Start,Elastic Net,4.613,6.086,0.742,30.16,64.68,55.56
+Cold Start,Linear Regression,4.637,6.064,0.744,29.76,63.1,53.97
+Cold Start,Gradient Boosting,4.687,5.978,0.751,27.38,64.29,52.78
+Cold Start,Random Forest,5.156,6.623,0.695,22.62,55.16,51.59
+Cold Start,Baseline,7.52,9.785,0.333,23.02,45.63,44.84
+Personalised,Gradient Boosting,3.32,4.461,0.858,42.62,77.48,55.44
+Personalised,Random Forest,3.392,4.596,0.85,42.07,77.06,56.41
+Personalised,Linear Regression,3.447,4.54,0.853,38.88,76.85,54.95
+Personalised,Lasso,3.448,4.558,0.852,39.02,76.92,54.89
+Personalised,Elastic Net,3.563,4.726,0.841,38.05,75.47,55.02
+Personalised,Baseline,5.251,7.169,0.635,31.39,62.58,46.99

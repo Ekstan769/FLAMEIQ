@@ -1,6 +1,12 @@
 ﻿"use client";
 
-import { createContext, useContext, useState, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
 
 interface User {
   id: string;
@@ -10,40 +16,111 @@ interface User {
 
 interface AuthContextValue {
   user: User | null;
-  login: (userData: User, token: string) => void;
+  login: (
+    userData: User,
+    token: string
+  ) => void;
   logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+const AuthContext =
+  createContext<AuthContextValue | undefined>(
+    undefined
+  );
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-  const login = useCallback((userData: User, token: string) => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("flameiq_token", token);
+export function AuthProvider({
+  children,
+}: AuthProviderProps) {
+
+  const [user, setUser] =
+    useState<User | null>(null);
+
+  useEffect(() => {
+
+    const storedUser =
+      localStorage.getItem(
+        "flameiq_user"
+      );
+
+    if (storedUser) {
+      try {
+        setUser(
+          JSON.parse(storedUser)
+        );
+      } catch (error) {
+        console.error(
+          "Unable to restore user:",
+          error
+        );
+
+        localStorage.removeItem(
+          "flameiq_user"
+        );
+      }
     }
+
+  }, []);
+
+  const login = (
+    userData: User,
+    token: string
+  ) => {
+
+    localStorage.setItem(
+      "flameiq_token",
+      token
+    );
+
+    localStorage.setItem(
+      "flameiq_user",
+      JSON.stringify(userData)
+    );
+
     setUser(userData);
-  }, []);
+  };
 
-  const logout = useCallback(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem("flameiq_token");
-    }
+  const logout = () => {
+
+    localStorage.removeItem(
+      "flameiq_token"
+    );
+
+    localStorage.removeItem(
+      "flameiq_user"
+    );
+
     setUser(null);
-  }, []);
+
+    window.location.href = "/login";
+  };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used within an AuthProvider");
+
+  const context =
+    useContext(AuthContext);
+
+  if (!context) {
+    throw new Error(
+      "useAuth must be used inside an AuthProvider"
+    );
   }
-  return ctx;
+
+  return context;
 }
