@@ -3,14 +3,6 @@
 import { useState, FormEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  UserRound,
-  Mail,
-  LockKeyhole,
-  Eye,
-  EyeOff,
-  Apple,
-} from "lucide-react";
 import { signup as signupRequest } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 
@@ -27,8 +19,6 @@ export default function SignupPage() {
     confirmPassword: "",
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -40,10 +30,21 @@ export default function SignupPage() {
     e.preventDefault();
     setError("");
 
+    if (!form.fullName.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
+
     if (!agreedToTerms) {
       setError("You must agree to the Terms & Conditions to continue.");
       return;
@@ -52,14 +53,22 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const { data } = await signupRequest({
-        name: form.fullName,
-        email: form.email,
+        name: form.fullName.trim(),
+        email: form.email.trim(),
         password: form.password,
       });
-      login(data.user, data.token);
-      router.push("/customer/dashboard");
-    } catch {
-      setError("Sign up failed. Please check your details and try again.");
+
+      if (data?.user && data?.token) {
+        login(data.user, data.token);
+        const targetRoute = data.user?.role === "VENDOR" ? "/vendor/dashboard" : "/customer/dashboard";
+        router.push(targetRoute);
+      } else {
+        router.push("/login");
+      }
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message || "Sign up failed. Please check your details and try again.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -107,7 +116,7 @@ export default function SignupPage() {
           </p>
 
           {/* Signup Form */}
-          <form>
+          <form onSubmit={handleSubmit}>
             {/* Full Name */}
             <div className="form-group">
               <label htmlFor="fullName">
@@ -119,6 +128,8 @@ export default function SignupPage() {
                 name="fullName"
                 type="text"
                 placeholder="Enter your full name"
+                value={form.fullName}
+                onChange={handleChange("fullName")}
               />
             </div>
 
@@ -133,6 +144,8 @@ export default function SignupPage() {
                 name="email"
                 type="email"
                 placeholder="Enter email address"
+                value={form.email}
+                onChange={handleChange("email")}
               />
             </div>
 
@@ -147,6 +160,8 @@ export default function SignupPage() {
                 name="password"
                 type="password"
                 placeholder="Enter new password"
+                value={form.password}
+                onChange={handleChange("password")}
               />
             </div>
 
@@ -161,6 +176,8 @@ export default function SignupPage() {
                 name="confirmPassword"
                 type="password"
                 placeholder="Re-type your password to confirm"
+                value={form.confirmPassword}
+                onChange={handleChange("confirmPassword")}
               />
             </div>
 
@@ -170,6 +187,8 @@ export default function SignupPage() {
                 id="terms"
                 name="terms"
                 type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
               />
 
               <label htmlFor="terms">
@@ -180,12 +199,15 @@ export default function SignupPage() {
               </label>
             </div>
 
+            {error && <p className="text-sm text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200 mt-2">{error}</p>}
+
             {/* Button */}
             <button
               type="submit"
               className="get-started"
+              disabled={loading}
             >
-              Get Started ↗
+              {loading ? "Creating Account..." : "Get Started ↗"}
             </button>
           </form>
         </div>

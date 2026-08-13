@@ -27,8 +27,8 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 
     req.user = {
       id: decoded.id,
-      role: decoded.role,
-    };
+      role: decoded.role as any,
+    } as any;
 
     return next();
   } catch (error) {
@@ -49,9 +49,12 @@ export const authorizeAdmin = (req: Request, res: Response, next: NextFunction) 
 
 
 export const signUp = async(req: Request, res: Response) => {
-    const { name, email, password } = req.body
-
     try {
+        if (!req.body || typeof req.body !== 'object') {
+          return res.status(400).json({ success: false, message: "Invalid request body" });
+        }
+        const { name, email, password } = req.body;
+
         if (!name || !email || !password) {
             return res.status(400).json({ message: "All fields required" });
         }
@@ -82,39 +85,69 @@ export const signUp = async(req: Request, res: Response) => {
           },
         });
 
-        // Generate and hash OTP, then save to OtpVerification model
-        const otp = generateOtp();
-        const otpExpiresAt = getOtpExpiration();
-        const codeHash = await hashOtp(otp);
+        try {
+          const otp = generateOtp();
+          const otpExpiresAt = getOtpExpiration();
+          const codeHash = await hashOtp(otp);
 
-        await prisma.otpVerification.create({
-          data: {
-            userId: user.id,
-            codeHash,
-            expiresAt: otpExpiresAt,
-            purpose: "REGISTRATION", // Or an enum for different OTP purposes
-          },
-        });
+          await prisma.otpVerification.create({
+            data: {
+              userId: user.id,
+              codeHash,
+              expiresAt: otpExpiresAt,
+              purpose: "REGISTRATION",
+            },
+          });
 
-        // Send OTP email
-        await emailService.sendEmail(
-          normalizedEmail,
-          "Your FLAMEIQ Verification Code",
-          `Welcome to FLAMEIQ! Your verification code is: ${otp}. It will expire in 10 minutes.`,
-          `<p>Welcome to FLAMEIQ! Your verification code is: <strong>${otp}</strong>. It will expire in 10 minutes.</p>`
+          await emailService.sendEmail(
+            normalizedEmail,
+            "Your FLAMEIQ Verification Code",
+            `Welcome to FLAMEIQ! Your verification code is: ${otp}. It will expire in 10 minutes.`,
+            `<p>Welcome to FLAMEIQ! Your verification code is: <strong>${otp}</strong>. It will expire in 10 minutes.</p>`
+          );
+        } catch (otpErr) {
+          logger.warn(`OTP creation or email sending failed: ${otpErr}`);
+        }
+
+        try {
+          const clientIp = (req as any).clientIp || '0.0.0.0';
+          const userAgent = req.headers['user-agent'] || 'unknown';
+          await prisma.loginHistory.create({
+            data: {
+              userId: user.id,
+              ipAddress: clientIp,
+              userAgent: userAgent
+            }
+          });
+          logger.info(`User ${user.email} signed up from IP ${clientIp}`);
+        } catch (histErr) {
+          logger.warn(`Could not save login history for ${user.email}`);
+        }
+
+        const payload = {
+          id: user.id,
+          email: String(user.email),
+          role: String(user.role),
+        };
+
+        const token = jwt.sign(
+          payload,
+          process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026",
+          {
+            expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any
+          }
         );
-
-        const clientIp = req.ip || '0.0.0.0';
-
-        logger.info(`User ${user.email} signed up from IP ${clientIp}`);
 
         return res.status(201).json({
           success: true,
           message: "User created successfully. Please check your email for the verification code.",
+          token,
+          user,
           userId: user.id,
         });
-    } catch (error) {
-        logger.error({ err: error }, "Sign-up process failed unexpectedly");
+    } catch (error: any) {
+        console.error("SignUp Error Stack:", error?.stack || error);
+        logger.error({ message: error?.message, stack: error?.stack }, "Sign-up process failed unexpectedly");
 
         return res.status(500).json({
           success: false,
@@ -199,8 +232,8 @@ export const verifyOtp = async (req: Request, res: Response) => {
     const payload = {
       id: user.id, email: user.email, role: user.role,
     };
-    const secret = process.env.JWT_SECRET || '';
-    const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || "1d" });
+    const secret = process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026";
+    const token = jwt.sign(payload, secret, { expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any });
 
     return res.status(200).json({ success: true, message: "Account verified successfully.", token, user });
   } catch (error) {
@@ -264,12 +297,12 @@ const payload = {
 };
 
 // 2. Pass the clean payload and cast the options
-const secret = process.env.JWT_SECRET || '';
+const secret = process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026";
 const token = jwt.sign(
   payload, 
   secret, 
   { 
-    expiresIn: process.env.JWT_EXPIRES_IN || "1d" // JWT expiresIn accepts string or number
+    expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any
   }
 );
 

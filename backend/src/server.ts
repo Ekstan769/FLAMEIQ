@@ -1,6 +1,7 @@
-/// <reference path="./types/express.d.ts" />
+import './types/express.d.ts';
 
 import express from 'express'
+import cors from 'cors'
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { notificationService } from './services/notificationService.js'
@@ -14,6 +15,7 @@ import { setupSwagger } from './config/swagger.js'
 dotenv.config()
 
 const app = express()
+app.use(cors())
 app.use(express.json())
 
 app.use(ipTracker)
@@ -97,6 +99,7 @@ app.post('/api/auth/verify-otp', verifyOtp);
  *         description: Invalid email or password
  */
 app.post('/api/auth/signin', signIn)
+app.post('/api/auth/login', signIn)
 
 /**
  * @swagger
@@ -182,15 +185,19 @@ app.get('/api/notifications/stream', (req, res) => {
   // Keep connection alive
   res.write(': keep-alive\n\n');
 
-  notificationService.addClient(clientId, res);
+  notificationService.addClient(res);
 });
 
 // --- Order Routes ---
 app.use('/api/orders', orderRoutes);
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 4000
 
-const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url)
+const isDirectRun =
+  !process.argv[1] ||
+  process.argv[1].toLowerCase() === fileURLToPath(import.meta.url).toLowerCase() ||
+  process.argv[1].endsWith('server.ts') ||
+  process.argv[1].endsWith('server.js');
 
 if (isDirectRun) {
   // Initialize background jobs

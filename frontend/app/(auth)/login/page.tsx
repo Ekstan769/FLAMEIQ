@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   UserRound,
   Mail,
@@ -16,6 +17,7 @@ import { login as loginUser } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
+  const router = useRouter();
   const { login } = useAuth();
 
   const [identifier, setIdentifier] = useState("");
@@ -31,7 +33,7 @@ export default function LoginPage() {
 
     setError("");
 
-    if (!identifier || !password) {
+    if (!identifier.trim() || !password) {
       setError("Please enter your email and password.");
       return;
     }
@@ -54,12 +56,13 @@ export default function LoginPage() {
       }
 
       login(user, token);
-      window.location.href = "/customer";
-    } catch (error: any) {
-      console.error("Login error:", error);
+      const targetRoute = user?.role === "VENDOR" ? "/vendor/dashboard" : "/customer/dashboard";
+      router.push(targetRoute);
+    } catch (err: any) {
+      console.error("Login error:", err);
       setError(
-        error?.response?.data?.message ||
-          error?.message ||
+        err?.response?.data?.message ||
+          err?.message ||
           "Unable to login. Please check your details and try again."
       );
     } finally {
@@ -162,7 +165,7 @@ export default function LoginPage() {
           </form>
 
           <p className="create-account">
-            Don&apos;t have a FlameIQ account? {" "}
+            Don&apos;t have a FlameIQ account?{" "}
             <Link href="/signup">Create Account</Link>
           </p>
         </div>

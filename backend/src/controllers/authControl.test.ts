@@ -99,11 +99,13 @@ describe('Auth Controller', () => {
       );
       expect(emailService.sendEmail).toHaveBeenCalled();
       expect(mockRes.status).toHaveBeenCalledWith(201);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        success: true,
-        message: 'User created successfully. Please check your email for the verification code.', // Corrected from previous diff
-        userId: createdUser.id,
-      });
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'User created successfully. Please check your email for the verification code.',
+          userId: createdUser.id,
+        })
+      );
     });
 
     it('should return 409 if user already exists', async () => {

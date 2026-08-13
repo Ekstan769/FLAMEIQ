@@ -42,10 +42,10 @@ class OrderService {
     }
   }
 
-  private notifyVendor(order: Order & { items: OrderItem[] }) {
-    notificationService.sendToClients([order.vendorId], {
+  private notifyVendor(order: Order) {
+    notificationService.broadcast({
       title: 'New Order Received',
-      message: `You have a new ${order.type.toLowerCase()} order! Total: $${order.totalAmount.toFixed(2)}`,
+      message: `You have a new ${order.type.toLowerCase()} order! Total: $${Number(order.totalAmount).toFixed(2)}`,
       type: 'info'
     });
   }
@@ -102,7 +102,7 @@ class OrderService {
     });
 
     // Notify user that it's on route
-    notificationService.sendToClients([order.userId], {
+    notificationService.broadcast({
       title: 'Order Accepted',
       message: 'Your order is on route!',
       type: 'success'
