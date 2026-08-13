@@ -92,11 +92,11 @@ export default function SignupPage() {
           />
         </div>
 
-        {/* Form Overlay */}
         <div className="signup-form-container">
-          {/* Signup Icon */}
           <div className="signup-icon">
-            ♙
+            <div className="signup-icon-inner">
+              <UserRound size={32} />
+            </div>
           </div>
 
           {/* Heading */}
