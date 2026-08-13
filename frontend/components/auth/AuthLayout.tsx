@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 
 export default function AuthLayout({
   children,
@@ -9,15 +10,8 @@ export default function AuthLayout({
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="flex h-[72px] items-center justify-between px-6 sm:px-10 lg:px-16">
-        {/* FlameIQ Logo */}
         <a href="/" className="flex items-center">
-          <span className="text-[22px] font-bold tracking-tight text-[#1F4E79]">
-            Flame
-          </span>
-
-          <span className="text-[22px] font-bold tracking-tight text-[#F5B700]">
-            IQ
-          </span>
+          <Image src="/images/logo.png" alt="FlameIQ logo" width={160} height={38} />
         </a>
 
         {/* Login */}

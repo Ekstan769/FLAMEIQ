@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Shield,
   Zap,
@@ -27,7 +28,7 @@ export default function WelcomePage() {
     <main className="min-h-screen bg-white">
       <header className="flex items-center justify-between px-6 py-5 md:px-12">
         <Link href="/" className="text-2xl font-bold text-brand-500">
-          Flame<span className="text-notify-500">IQ</span>
+          <Image src="/images/logo.png" alt="FlameIQ logo" width={160} height={36} />
         </Link>
 
         <div className="flex items-center gap-3">
@@ -62,11 +63,11 @@ export default function WelcomePage() {
           md:grid-cols-2
           md:px-12
           md:py-14
-          bg-[url('/images/mb-hero-flameiq.png')]
+          bg-[url('/images/Heroflamee.png')]
           bg-contain
           bg-bottom
           bg-no-repeat
-          md:bg-[url('/images/hero-flameiq.png')]
+          md:bg-[url('/images/Heroflamee.png')]
           md:bg-right
         "
       >

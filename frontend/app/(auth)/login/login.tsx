@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   UserRound,
   Mail,
@@ -63,12 +64,13 @@ export default function Login() {
 
       // Redirect after successful login
       window.location.href = "/customer";
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Login error:", error);
 
+      const err = error as any;
       setError(
-        error?.response?.data?.message ||
-          error?.message ||
+        err?.response?.data?.message ||
+          err?.message ||
           "Unable to login. Please check your details and try again."
       );
     } finally {
@@ -83,13 +85,11 @@ export default function Login() {
       <header className="auth-header">
 
         <Link href="/" className="flameiq-logo">
-          <span className="logo-flame">♨</span>
-          <span>Flame</span>
-          <strong>IQ</strong>
+          <Image src="/images/logo.png" alt="FlameIQ logo" width={140} height={34} />
         </Link>
 
-        <div className="auth-header-right">
-          <span>Don't have an account?</span>
+        {/* <div className="auth-header-right">
+          <span>Don&apos;t have an account?</span>
 
           <Link
             href="/signup"
@@ -97,7 +97,7 @@ export default function Login() {
           >
             Sign Up
           </Link>
-        </div>
+        </div> */}
 
       </header>
 
@@ -271,7 +271,7 @@ export default function Login() {
           {/* CREATE ACCOUNT */}
           <p className="create-account">
 
-            Don't have a FlameIQ account?{" "}
+            Don&apos;t have a FlameIQ account?{" "}
 
             <Link href="/signup">
               Create Account

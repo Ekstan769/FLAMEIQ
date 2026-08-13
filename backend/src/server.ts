@@ -73,6 +73,7 @@ app.post('/api/auth/signup', signUp)
  */
 app.post('/api/auth/verify-otp', verifyOtp);
 
+
 /**
  * @swagger
  * /api/auth/signin:

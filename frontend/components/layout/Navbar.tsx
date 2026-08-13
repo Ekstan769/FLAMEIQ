@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Bell, MapPin } from "lucide-react";
 import type { Portal } from "@/types/portal";
 
@@ -24,8 +25,7 @@ export default function Navbar({ portal }: { portal: Portal }) {
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
-      {/* Swap for <Image src="/images/logo.png" .../> once the logo is ready */}
-      <span className="text-lg font-bold text-ink-500">FlameIQ</span>
+      <Image src="/images/logo.png" alt="FlameIQ logo" width={140} height={34} />
       <span className="text-xs font-medium uppercase tracking-wide text-muted-500">
         {portal}
       </span>

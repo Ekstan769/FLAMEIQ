@@ -3,6 +3,7 @@
 import { useState, FormEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   UserRound,
   Mail,
@@ -70,7 +71,7 @@ export default function SignupPage() {
       {/* Header */}
       <header className="signup-header">
         <Link href="/" className="logo">
-           Flame<strong>IQ</strong>
+          <Image src="/images/logo.png" alt="FlameIQ logo" width={140} height={34} />
         </Link>
 
         <div className="login-link">
@@ -87,7 +88,7 @@ export default function SignupPage() {
         {/* Background Image */}
         <div className="signup-background">
           <img
-            src="/images/gas-phone.png"
+            src="/images/Heroflamee.png"
             alt="FlameIQ gas cylinder and mobile application"
           />
         </div>
@@ -107,7 +108,7 @@ export default function SignupPage() {
           </p>
 
           {/* Signup Form */}
-          <form>
+          <form onSubmit={handleSubmit} noValidate>
             {/* Full Name */}
             <div className="form-group">
               <label htmlFor="fullName">
@@ -119,6 +120,8 @@ export default function SignupPage() {
                 name="fullName"
                 type="text"
                 placeholder="Enter your full name"
+                value={form.fullName}
+                onChange={handleChange("fullName")}
               />
             </div>
 
@@ -133,6 +136,8 @@ export default function SignupPage() {
                 name="email"
                 type="email"
                 placeholder="Enter email address"
+                value={form.email}
+                onChange={handleChange("email")}
               />
             </div>
 
@@ -142,12 +147,25 @@ export default function SignupPage() {
                 Create a New Password
               </label>
 
-              <input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="Enter new password"
-              />
+              <div className="input-wrapper">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter new password"
+                  value={form.password}
+                  onChange={handleChange("password")}
+                />
+
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             {/* Confirm Password */}
@@ -156,12 +174,25 @@ export default function SignupPage() {
                 Confirm New Password
               </label>
 
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                placeholder="Re-type your password to confirm"
-              />
+              <div className="input-wrapper">
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Re-type your password to confirm"
+                  value={form.confirmPassword}
+                  onChange={handleChange("confirmPassword")}
+                />
+
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowConfirmPassword((s) => !s)}
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
             {/* Terms */}
@@ -170,22 +201,20 @@ export default function SignupPage() {
                 id="terms"
                 name="terms"
                 type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
               />
 
               <label htmlFor="terms">
-                I agree to the{" "}
-                <strong>Terms & Conditions</strong>{" "}
-                and{" "}
-                <strong>Privacy Policy</strong>.
+                I agree to the <strong>Terms & Conditions</strong> and <strong>Privacy Policy</strong>.
               </label>
             </div>
 
+            {error && <p className="signup-error">{error}</p>}
+
             {/* Button */}
-            <button
-              type="submit"
-              className="get-started"
-            >
-              Get Started ↗
+            <button type="submit" className="get-started" disabled={loading}>
+              {loading ? "Creating account..." : "Get Started ↗"}
             </button>
           </form>
         </div>

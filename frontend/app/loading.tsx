@@ -8,7 +8,7 @@ export default function Loading() {
           <div className="flex flex-col items-center gap-4">
             <div className="relative h-20 w-44">
               <Image
-                src="/images/logo.svg"
+                src="/images/logo.png"
                 alt="FlameIQ logo"
                 fill
                 priority
@@ -28,7 +28,7 @@ export default function Loading() {
 
           <div className="relative h-[320px] w-full max-w-sm mx-auto">
             <Image
-              src="/images/loading-cylinder.png"
+              src="/images/load-cylinder.png"
               alt="FlameIQ gas cylinder"
               fill
               priority
