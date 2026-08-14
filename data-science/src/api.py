@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from predict import predict_refill
+from chatbot import handle_chat_message
 
 app = FastAPI(
     title="FlameIQ Prediction Service",
@@ -66,6 +67,24 @@ class RefillPredictionRequest(BaseModel):
         }
 
 
+class ChatTurn(BaseModel):
+    role: str = Field(..., description="'user' or 'assistant'")
+    text: str
+
+
+class ChatMessageRequest(BaseModel):
+    user_message: str
+    conversation_history: list[ChatTurn] = []
+    household_profile: dict = Field(
+        ...,
+        description=(
+            "This user's stored profile fields — same shape as "
+            "RefillPredictionRequest. Backend should supply this from "
+            "the user's saved data, not ask the user to type it in chat."
+        ),
+    )
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -80,3 +99,22 @@ def predict_refill_endpoint(payload: RefillPredictionRequest) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Prediction service error: {exc}") from exc
+
+
+@app.post("/v1/chat/message")
+def chat_endpoint(payload: ChatMessageRequest) -> dict:
+    try:
+        reply = handle_chat_message(
+            user_message=payload.user_message,
+            conversation_history=[turn.model_dump() for turn in payload.conversation_history],
+            household_profile=payload.household_profile,
+        )
+        return {"reply": reply}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        # e.g. GEMINI_API_KEY missing — a config problem, not the caller's fault.
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Chat service error: {exc}") from exc
+
