@@ -2,6 +2,7 @@ import { Order, OrderItem, OrderStatus, OrderType, Prisma } from '@prisma/client
 import { prisma } from '../db/prisma.js';
 import { notificationService } from './notificationService.js';
 import { logger } from '../utils/logger.js';
+import { OrderNotFoundError, UnauthorizedError, InvalidOrderStatusError, BadRequestError, AppError } from '@/utils/errors.js';
 
 // Use a type for creation that doesn't require all Order fields
 type OrderItemCreateInput = Omit<OrderItem, 'id' | 'orderId'>;
@@ -14,7 +15,7 @@ class OrderService {
    * should be handled by a separate, persistent job queue (e.g., BullMQ with Redis)
    * instead of `setTimeout` to guarantee execution.
    */
-  public async createOrder(userId: string, vendorId: string, items: OrderItemCreateInput[], type: OrderType): Promise<Order> {
+  public async createOrder(userId: string, vendorId: string, items: OrderItemCreateInput[], type: OrderType, cylinderId?: string): Promise<Order> {
     const totalAmount = items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0);
 
     try {
@@ -24,6 +25,7 @@ class OrderService {
           vendorId,
           type,
           totalAmount,
+          cylinderId,
           items: {
             create: items,
           },
@@ -38,7 +40,7 @@ class OrderService {
       return order;
     } catch (error) {
       logger.error({ err: error }, 'Failed to create order in database');
-      throw new Error('Database operation failed during order creation.');
+      throw new AppError('Database operation failed during order creation.', 500);
     }
   }
 
@@ -57,19 +59,19 @@ class OrderService {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
 
     if (!order) {
-      throw new Error('Order not found');
+      throw new OrderNotFoundError();
     }
 
     if (order.userId !== userId) {
-      throw new Error('Unauthorized');
+      throw new UnauthorizedError('You do not have permission to cancel this order.');
     }
 
     if (order.type === 'QUICK') {
-      throw new Error('Quick orders cannot be cancelled');
+      throw new BadRequestError('Quick orders cannot be cancelled.');
     }
 
-    if (order.status !== 'PENDING') {
-      throw new Error('Order can no longer be cancelled');
+    if (order.status !== OrderStatus.PENDING) {
+      throw new InvalidOrderStatusError(`Order cannot be cancelled in ${order.status} status.`);
     }
 
     return prisma.order.update({
@@ -85,27 +87,124 @@ class OrderService {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
 
     if (!order) {
-      throw new Error('Order not found');
+      throw new OrderNotFoundError();
     }
 
     if (order.vendorId !== vendorId) {
-      throw new Error('Unauthorized');
+      throw new UnauthorizedError('You are not authorized to accept this order.');
     }
 
-    if (order.status !== 'PENDING') {
-      throw new Error(`Cannot accept order with status: ${order.status}`);
+    if (order.status !== OrderStatus.PENDING) {
+      throw new InvalidOrderStatusError(`Order cannot be accepted in ${order.status} status.`);
     }
 
     const updatedOrder = await prisma.order.update({
       where: { id: orderId },
-      data: { status: 'ON_ROUTE' },
+      data: { status: OrderStatus.ACCEPTED },
     });
 
     // Notify user that it's on route
     notificationService.broadcast({
       title: 'Order Accepted',
-      message: 'Your order is on route!',
+      message: 'Your order has been accepted by the vendor and is being prepared.',
       type: 'success'
+    });
+
+    return updatedOrder;
+  }
+
+  /**
+   * Vendor marks an accepted order as on route for delivery.
+   */
+  public async markOrderAsOnRoute(orderId: string, vendorId: string): Promise<Order> {
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+
+    if (!order) {
+      throw new OrderNotFoundError();
+    }
+
+    if (order.vendorId !== vendorId) {
+      throw new UnauthorizedError('You are not authorized to update this order.');
+    }
+
+    if (order.status !== OrderStatus.ACCEPTED) {
+      throw new InvalidOrderStatusError(`Order must be in ACCEPTED status to be marked as on route. Current status: ${order.status}`);
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.ON_ROUTE },
+    });
+
+    notificationService.broadcast({
+      title: 'Order On Route',
+      message: 'Your order is now on its way to you!',
+      type: 'info'
+    });
+
+    return updatedOrder;
+  }
+  /**
+   * Vendor marks an order as delivered.
+   */
+  public async markOrderAsDelivered(orderId: string, vendorId: string): Promise<Order> {
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+
+    if (!order) {
+      throw new OrderNotFoundError();
+    }
+
+    if (order.vendorId !== vendorId) {
+      throw new UnauthorizedError('You are not authorized to mark this order as delivered.');
+    }
+
+    if (order.status !== OrderStatus.ON_ROUTE) {
+      throw new InvalidOrderStatusError(`Order cannot be marked as delivered in ${order.status} status.`);
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.DELIVERED },
+    });
+
+    // Notify user that it's delivered
+    notificationService.broadcast({
+      title: 'Order Delivered',
+      message: 'Your order has been delivered!',
+      type: 'success'
+    });
+
+    return updatedOrder;
+  }
+
+  /**
+   * Vendor rejects a pending order.
+   */
+  public async rejectOrder(orderId: string, vendorId: string): Promise<Order> {
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+
+    if (!order) {
+      throw new OrderNotFoundError();
+    }
+
+    if (order.vendorId !== vendorId) {
+      throw new UnauthorizedError('You are not authorized to reject this order.');
+    }
+
+    if (order.status !== OrderStatus.PENDING) {
+      throw new InvalidOrderStatusError(`Order cannot be rejected in ${order.status} status.`);
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.REJECTED },
+    });
+
+    // Notify user that the order was rejected
+    notificationService.broadcast({
+      title: 'Order Rejected',
+      message: 'Your order has been rejected by the vendor.',
+      type: 'error'
     });
 
     return updatedOrder;
@@ -119,7 +218,7 @@ class OrderService {
       where: {
         userId,
         status: {
-          notIn: ['CANCELLED', 'DELIVERED'],
+          notIn: [OrderStatus.CANCELLED, OrderStatus.DELIVERED, OrderStatus.REJECTED],
         },
       },
       include: { items: true },

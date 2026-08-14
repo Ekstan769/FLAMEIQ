@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "@/db/prisma.js";
 import * as adminService from '@/services/adminService.js'
 import { logger } from '@/utils/logger.js';
+import { UnauthorizedError, AppError } from '@/utils/errors.js';
 import { generateOtp, getOtpExpiration, hashOtp } from "@/utils/otp.js";
 import { emailService } from "@/services/emailService.js";
 //import { uploadToCloudinary } from "../utils/upload";
@@ -21,7 +22,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
-      id: string;
+      id: number;
       role: string;
     };
 
@@ -47,6 +48,30 @@ export const authorizeAdmin = (req: Request, res: Response, next: NextFunction) 
   return next();
 };
 
+export const authorizeVendor = async (req: Request, res: Response, next: NextFunction) => {
+  const userId = req.user?.id;
+
+  if (!userId) {
+    // This should technically be caught by `authenticate` first
+    return res.status(401).json({ success: false, message: "Authentication required." });
+  }
+
+  // Admins can also perform vendor actions
+  if (req.user!.role === 'ADMIN') {
+    return next();
+  }
+
+  try {
+    const profile = await prisma.profile.findUnique({ where: { userId } });
+    if (profile?.profileType === 'VENDOR') {
+      return next();
+    }
+    return res.status(403).json({ success: false, message: "Forbidden: Vendor access required." });
+  } catch (error) {
+    logger.error({ err: error, userId }, "Vendor authorization check failed");
+    return res.status(500).json({ success: false, message: "An unexpected error occurred during authorization." });
+  }
+};
 
 export const signUp = async(req: Request, res: Response) => {
     try {
@@ -62,7 +87,7 @@ export const signUp = async(req: Request, res: Response) => {
         const normalizedEmail = String(email).toLowerCase();
 
         const existingUser = await prisma.user.findFirst({
-          where: { email: normalizedEmail, deletedAt: null },
+          where: { email: normalizedEmail,},
         });
 
         if (existingUser) {
@@ -109,40 +134,9 @@ export const signUp = async(req: Request, res: Response) => {
           logger.warn(`OTP creation or email sending failed: ${otpErr}`);
         }
 
-        try {
-          const clientIp = (req as any).clientIp || '0.0.0.0';
-          const userAgent = req.headers['user-agent'] || 'unknown';
-          await prisma.loginHistory.create({
-            data: {
-              userId: user.id,
-              ipAddress: clientIp,
-              userAgent: userAgent
-            }
-          });
-          logger.info(`User ${user.email} signed up from IP ${clientIp}`);
-        } catch (histErr) {
-          logger.warn(`Could not save login history for ${user.email}`);
-        }
-
-        const payload = {
-          id: user.id,
-          email: String(user.email),
-          role: String(user.role),
-        };
-
-        const token = jwt.sign(
-          payload,
-          process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026",
-          {
-            expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any
-          }
-        );
-
         return res.status(201).json({
           success: true,
           message: "User created successfully. Please check your email for the verification code.",
-          token,
-          user,
           userId: user.id,
         });
     } catch (error: any) {
@@ -198,13 +192,6 @@ export const verifyOtp = async (req: Request, res: Response) => {
       });
     }
 
-    if (otpRecord.expiresAt < new Date()) {
-      return res.status(401).json({
-        success: false,
-        message: "OTP has expired. Please request a new one.",
-      });
-    }
-
     // OTP is valid, clear it and generate JWT
     await prisma.otpVerification.update({
       where: { id: otpRecord.id },
@@ -252,10 +239,10 @@ export const signIn = async (req: Request, res: Response) =>{
         message: "email and password required"
       });
     }
-    //find by email
+    const normalizedEmail = email.toLowerCase();
     const user = await prisma.user.findFirst({
       where: {
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         deletedAt: null,
       },
       include: { profile: true },
@@ -270,13 +257,14 @@ export const signIn = async (req: Request, res: Response) =>{
     const PasswordValid = await bcrypt.compare(password, user.password);
     if(!PasswordValid){
       logger.warn(`Failed login attempt for email ${email} from IP ${req.ip}`);
+      logger.warn(`Failed login attempt for email ${normalizedEmail} from IP ${(req as any).clientIp || req.ip}`);
       return res.status(401).json({
         success: false,
         message: "Invalid email or password"
       });
     }
 
-    const clientIp = req.ip || '0.0.0.0';
+    const clientIp = (req as any).clientIp || req.ip || '0.0.0.0';
     const userAgent = req.headers['user-agent'] || 'unknown';
     await prisma.loginHistory.create({
       data: {
@@ -288,8 +276,6 @@ export const signIn = async (req: Request, res: Response) =>{
     logger.info(`User ${user.email} signed in from IP ${clientIp}`);
 
 
-    
-   
 const payload = {
   id: user.id,
   email: user.email,
@@ -299,9 +285,9 @@ const payload = {
 // 2. Pass the clean payload and cast the options
 const secret = process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026";
 const token = jwt.sign(
-  payload, 
-  secret, 
-  { 
+  payload,
+  secret,
+  {
     expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any
   }
 );
@@ -328,6 +314,92 @@ const token = jwt.sign(
       message: "unexpected server error"
     });
 
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required." });
+  }
+
+  try {
+    const normalizedEmail = String(email).toLowerCase();
+    const user = await prisma.user.findFirst({
+      where: { email: normalizedEmail, deletedAt: null },
+    });
+
+    // To prevent email enumeration, always return a success-like message.
+    // Only proceed if the user actually exists.
+    if (user) {
+      const otp = generateOtp();
+      const otpExpiresAt = getOtpExpiration();
+      const codeHash = await hashOtp(otp);
+
+      await prisma.otpVerification.create({
+        data: {
+          userId: user.id,
+          codeHash,
+          expiresAt: otpExpiresAt,
+          purpose: "PASSWORD_RESET",
+        },
+      });
+
+      await emailService.sendEmail(
+        normalizedEmail,
+        "Your FLAMEIQ Password Reset Code",
+        `Your password reset code is: ${otp}. It will expire in 10 minutes.`,
+        `<p>Your password reset code is: <strong>${otp}</strong>. It will expire in 10 minutes.</p>`
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "If an account with that email exists, a password reset code has been sent.",
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Forgot password process failed");
+    return res.status(500).json({ success: false, message: "An unexpected error occurred." });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({ success: false, message: "Email, OTP, and new password are required." });
+  }
+
+  try {
+    const normalizedEmail = String(email).toLowerCase();
+    const otpRecord = await prisma.otpVerification.findFirst({
+      where: {
+        user: { email: normalizedEmail },
+        purpose: "PASSWORD_RESET",
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otpRecord || !(await bcrypt.compare(otp, otpRecord.codeHash))) {
+      return res.status(401).json({ success: false, message: "Invalid or expired OTP." });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: otpRecord.userId },
+      data: { password: hashedPassword },
+    });
+
+    await prisma.otpVerification.update({ where: { id: otpRecord.id }, data: { usedAt: new Date() } });
+
+    return res.status(200).json({ success: true, message: "Password has been reset successfully." });
+  } catch (error) {
+    logger.error({ err: error }, "Reset password process failed");
+    return res.status(500).json({ success: false, message: "An unexpected error occurred." });
   }
 };
 
@@ -404,5 +476,34 @@ export const updateProfile = async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ err: error }, "Profile update failed");
     return res.status(500).json({ success: false, message: "Failed to update profile" });
+  }
+};
+
+export const getMe = async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ success: false, message: "Unauthorized access." });
+    }
+
+    const userId = req.user.id;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        profile: true,
+        cylinders: true,
+        orders: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    return res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    logger.error({ err: error }, "Failed to fetch user profile");
+    return res.status(500).json({ success: false, message: "Failed to fetch user profile." });
   }
 };
