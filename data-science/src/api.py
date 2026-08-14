@@ -1,7 +1,8 @@
 """
 FlameIQ Prediction API
 =======================
-Thin HTTP wrapper around predict.predict_refill() for Backend/Frontend.
+Thin HTTP wrapper around Didi's predict.py (predict_refill) for
+Backend/Frontend integration.
 
 Run locally:
     uvicorn api:app --host 0.0.0.0 --port 8000
@@ -18,12 +19,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from predict import PredictionInputError, predict_refill
+from predict import predict_refill
 
 app = FastAPI(
     title="FlameIQ Prediction Service",
     description="Smart Refill Prediction — cold-start and personalised LPG refill estimates.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 # Allow the FlameIQ frontend/chatbot to call this during hackathon dev.
@@ -42,7 +43,7 @@ class RefillPredictionRequest(BaseModel):
     household_size: int
     meals_per_day: int
     cooking_days_per_week: int
-    lpg_primary_fuel: str = Field(..., description="'yes' or 'no'")
+    lpg_primary_fuel: str = Field(..., description="Yes/No, True/False, or 1/0")
     usage_change: str = Field(..., description="'less', 'normal', or 'more'")
     last_refill_date: str = Field(..., description="ISO date, e.g. 2026-08-01")
     number_previous_cycles: int = 0
@@ -74,7 +75,8 @@ def health() -> dict:
 def predict_refill_endpoint(payload: RefillPredictionRequest) -> dict:
     try:
         return predict_refill(payload.model_dump(exclude_none=True))
-    except PredictionInputError as exc:
+    except ValueError as exc:
+        # predict.py raises plain ValueError for all input/validation problems.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Prediction service error: {exc}") from exc
