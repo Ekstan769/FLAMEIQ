@@ -25,7 +25,11 @@ from google.genai import types
 
 from predict import predict_refill
 
-GEMINI_MODEL = "gemini-2.5-flash"
+# Gemini model names get deprecated frequently — override via the
+# GEMINI_MODEL environment variable on Render if this one stops working,
+# without needing a new code deploy. Check https://ai.google.dev/gemini-api/docs/models
+# for the current recommended model if you hit a 404 "no longer available" error.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.7-flash")
 
 SYSTEM_PROMPT = """You are the FlameIQ assistant — a friendly helper inside a household LPG \
 (cooking gas) app used by Nigerian households.
@@ -113,3 +117,4 @@ def handle_chat_message(
         ),
     )
     return response.text
+    
