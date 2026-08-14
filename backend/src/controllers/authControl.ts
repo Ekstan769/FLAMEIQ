@@ -4,9 +4,9 @@ import jwt from "jsonwebtoken";
 import { prisma } from "@/db/prisma.js";
 import * as adminService from '@/services/adminService.js'
 import { logger } from '@/utils/logger.js';
-import { UnauthorizedError, AppError } from '@/utils/errors.js';
+//import { UnauthorizedError, AppError } from '@/utils/errors.js';
 import { generateOtp, getOtpExpiration, hashOtp } from "@/utils/otp.js";
-import { emailService } from "@/services/emailService.js";
+import { emailService } from "../services/emailService.js";
 //import { uploadToCloudinary } from "../utils/upload";
 
 
@@ -73,42 +73,42 @@ export const authorizeVendor = async (req: Request, res: Response, next: NextFun
   }
 };
 
+
 export const signUp = async(req: Request, res: Response) => {
-    try {
-        if (!req.body || typeof req.body !== 'object') {
-          return res.status(400).json({ success: false, message: "Invalid request body" });
-        }
-        const { name, email, password } = req.body;
-
-        if (!name || !email || !password) {
-            return res.status(400).json({ message: "All fields required" });
+    const{name, email, password} = req.body // stores input from body
+    try{
+        if(!name||!email||!password)
+            /*if no first name or no last name or no email or no password run the next code:-*/
+        {
+            return res.status(400).json({message:"All fields required"});
         }
 
-        const normalizedEmail = String(email).toLowerCase();
+     // 1. Check if the user already exists
+     const existingUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() }, // Normalizing email to lowercase is highly recommended
+    });
 
-        const existingUser = await prisma.user.findFirst({
-          where: { email: normalizedEmail,},
-        });
+    if (existingUser) {
+      return res.status(409).json({ message: "User already exists" });
+    }
 
-        if (existingUser) {
-          return res.status(409).json({ message: "User already exists" });
-        }
+    // 2. Hash your password here before inserting (e.g., using bcrypt)
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 10); //call bcrypt to hash password and save hashed password
 
         const user = await prisma.user.create({
-          data: {
-            name,
-            email: normalizedEmail,
-            password: hashedPassword,
-          },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        });
+      data: {
+        name,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+      },
+      // Safely return only the fields the frontend needs
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
 
         try {
           const otp = generateOtp();
@@ -125,7 +125,7 @@ export const signUp = async(req: Request, res: Response) => {
           });
 
           await emailService.sendEmail(
-            normalizedEmail,
+            email,
             "Your FLAMEIQ Verification Code",
             `Welcome to FLAMEIQ! Your verification code is: ${otp}. It will expire in 10 minutes.`,
             `<p>Welcome to FLAMEIQ! Your verification code is: <strong>${otp}</strong>. It will expire in 10 minutes.</p>`
@@ -464,7 +464,6 @@ export const updateProfile = async (req: Request, res: Response) => {
         phone: phone ? String(phone) : null,
         address: address ? String(address) : null,
         profilePic: profilePic ? String(profilePic) : null,
-        email: null,
       },
     });
 
