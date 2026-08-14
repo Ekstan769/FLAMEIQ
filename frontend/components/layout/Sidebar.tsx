@@ -1,23 +1,37 @@
 import Link from "next/link";
 import {
-  Home, ClipboardList, Zap, Wallet, User,
-  Package, BarChart3, DollarSign, Settings,
+  LayoutDashboard,
+  ShoppingCart,
+  Truck,
+  Zap,
+  Wallet,
+  Store,
+  Settings,
+  Package,
+  BarChart3,
+  DollarSign,
+  ClipboardList,
 } from "lucide-react";
 import type { Portal } from "@/types/portal";
 
-const NAV_ITEMS: Record<
-  Portal,
-  { path: string; label: string; icon: React.ElementType }[]
-> = {
+type NavItem = {
+  path: string;
+  label: string;
+  icon: React.ElementType;
+};
+
+const NAV_ITEMS: Record<Portal, NavItem[]> = {
   customer: [
-    { path: "dashboard", label: "Home", icon: Home },
-    { path: "orders", label: "Orders", icon: ClipboardList },
+    { path: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { path: "orders", label: "Order Gas", icon: ShoppingCart },
+    { path: "track-delivery", label: "Track Order", icon: Truck },
     { path: "smart-refill", label: "Smart Refill", icon: Zap },
     { path: "wallet", label: "Wallet", icon: Wallet },
-    { path: "settings", label: "Profile", icon: User },
+    { path: "vendor-inquiry", label: "Vendor Inquiry", icon: Store },
+    { path: "settings", label: "Settings", icon: Settings },
   ],
   vendor: [
-    { path: "dashboard", label: "Home", icon: Home },
+    { path: "dashboard", label: "Home", icon: LayoutDashboard },
     { path: "inventory", label: "Inventory", icon: Package },
     { path: "analytics", label: "Analytics", icon: BarChart3 },
     { path: "earnings", label: "Earnings", icon: DollarSign },
