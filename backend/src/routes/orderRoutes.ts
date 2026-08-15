@@ -1,20 +1,32 @@
 import { Router } from 'express';
+import {
+  createOrder,
+  getOrders,
+  cancelOrder,
+  acceptOrder,
+  setOrderOnRoute,
+  setOrderDelivered,
+  rejectOrder,
+} from '../controllers/orderController.js';
 import { authenticate, authorizeVendor } from '../controllers/authControl.js';
-import { createOrder, cancelOrder, acceptOrder, getMyOrders, markOrderAsOnRoute, markOrderAsDelivered, rejectOrder } from '../controllers/orderController.js';
 
 const router = Router();
 
-// All order routes require a user to be authenticated
+// Apply authentication middleware to all routes in this file
 router.use(authenticate);
 
-router.route('/').post(createOrder).get(getMyOrders);
+// Routes for creating and fetching orders
+router.route('/')
+  .post(createOrder)
+  .get(getOrders);
 
+// Route for a user to cancel their own order
 router.patch('/:id/cancel', cancelOrder);
 
-// Vendor-specific actions
+// Routes for vendors to manage order status
 router.patch('/:id/accept', authorizeVendor, acceptOrder);
+router.patch('/:id/on-route', authorizeVendor, setOrderOnRoute);
+router.patch('/:id/delivered', authorizeVendor, setOrderDelivered);
 router.patch('/:id/reject', authorizeVendor, rejectOrder);
-router.patch('/:id/on-route', authorizeVendor, markOrderAsOnRoute);
-router.patch('/:id/delivered', authorizeVendor, markOrderAsDelivered);
 
 export default router;

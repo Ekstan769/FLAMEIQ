@@ -9,6 +9,7 @@ import { notificationService } from './services/notificationService.js'
 import { predictionJob } from './jobs/predictionJob.js';
 import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, forgotPassword, getMe, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
 import { uploadProfilePicture } from './controllers/uploadController.js';
+import { handleFlutterwaveWebhook } from './controllers/paymentController.js';
 import orderRoutes from './routes/orderRoutes.js';
 import cylinderRoutes from './routes/cylinderRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
@@ -642,6 +643,41 @@ app.use('/api/cylinders', cylinderRoutes);
  *         description: Invalid input, not authorized, or review already exists.
  */
 app.use('/api/reviews', reviewRoutes);
+
+// --- Payment Webhook Route ---
+/**
+ * @swagger
+ * tags:
+ *   name: Payments
+ *   description: API for handling payment gateway webhooks
+ */
+
+/**
+ * @swagger
+ * /api/payments/webhook:
+ *   post:
+ *     summary: Handles payment confirmation webhooks from Flutterwave
+ *     tags: [Payments]
+ *     description: This endpoint receives webhook events from Flutterwave to confirm payment status. It should not be called directly by a client.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               event:
+ *                 type: string
+ *                 example: charge.completed
+ *               data:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Webhook received and acknowledged.
+ *       401:
+ *         description: Invalid webhook signature.
+ */
+app.post('/api/payments/webhook', handleFlutterwaveWebhook);
 
 const PORT = process.env.PORT || 4000
 

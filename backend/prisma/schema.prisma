@@ -11,6 +11,7 @@ datasource db {
 
 enum TxType {
   DEPOSIT
+  PAYOUT // Represents the automatic credit transfer to a vendor
   WITHDRAWAL
   PAYMENT
   REFUND
@@ -20,6 +21,13 @@ enum TxStatus {
   PENDING
   SUCCESS
   FAILED
+}
+
+enum PayoutStatus {
+  PENDING // Payout is due but not yet sent to the payment gateway
+  PROCESSING // Payout has been initiated with the payment gateway
+  PAID // Payout confirmed as successful
+  FAILED // Payout failed
 }
 
 enum OrderStatus {
@@ -89,6 +97,8 @@ model User {
   receivedReviews  Review[]          @relation("ReceivedReviews")
   orders           Order[]           @relation("UserOrders") // Added for Order.user relation
   vendorOrders     Order[]           @relation("VendorOrders") // Added for Order.vendor relation
+  sourceTransactions Transaction[] @relation("SourceTransactions")
+  destinationTransactions Transaction[] @relation("DestinationTransactions")
   cylinders        Cylinder[]
 
   @@index([email])
@@ -187,19 +197,23 @@ model LoginHistory {
 }
 
 model Transaction {
-  orderId     String?  @unique
+  orderId     String?
   order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
   id          String   @id @default(uuid()) // Changed to UUID
   amount      Decimal
+  commission  Decimal  @default(0.00) // Platform's commission on a PAYMENT
   type        TxType
   status      TxStatus
   reference   String   @unique
   description String?
+  gateway     String?  // e.g., "flutterwave"
+  gatewayReference String? @unique // Transaction ID from the payment gateway
   createdAt   DateTime @default(now())
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  userId      String? // Changed to String
 
-  @@index([userId])
+  sourceUserId      String? // For PAYMENT, this is the customer.
+  sourceUser        User?   @relation("SourceTransactions", fields: [sourceUserId], references: [id], onDelete: SetNull)
+  destinationUserId String? // For PAYOUT, this is the vendor.
+  destinationUser   User?   @relation("DestinationTransactions", fields: [destinationUserId], references: [id], onDelete: SetNull)
 }
 
 model Order {
@@ -219,10 +233,24 @@ model Order {
 
   items       OrderItem[]
   review      Review?
-  transaction Transaction?
+  transactions Transaction[]
+  payout      Payout? // An order has one associated payout to the vendor
 
   @@index([userId])
   @@index([vendorId])
+}
+
+model Payout {
+  id        String   @id @default(uuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id])
+  vendorId  String
+  vendor    User     @relation(fields: [vendorId], references: [id], onDelete: NoAction)
+  amount    Decimal // The net amount to be paid to the vendor
+  status    PayoutStatus @default(PENDING)
+  gatewayReference String? @unique // The reference for the transfer from the payment gateway
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model OrderItem {
