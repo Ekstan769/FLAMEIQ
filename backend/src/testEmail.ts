@@ -2,7 +2,7 @@
 import "dotenv/config";
 import { sendOtp } from "./lib/otpSender.js";
 
-const testEmail = ""; 
+const testEmail = "fnHt2@example.com"; 
 
 sendOtp("email", "123456", { email: testEmail })
     .then(() => console.log("OTP email sent successfully"))

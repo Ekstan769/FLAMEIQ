@@ -1,4 +1,3 @@
-.DS_Store
 node_modules/
 /.vscode
 /.idea
@@ -11,7 +10,10 @@ pnpm-debug.log*
 .env
 .env.*
 
-# OS files
+# Logs
+logs/
+*.log
+
 Thumbs.db
 ehthumbs.db
 /src/generated/prisma

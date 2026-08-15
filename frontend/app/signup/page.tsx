@@ -3,6 +3,7 @@
 import { useState, FormEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+<<<<<<< HEAD:frontend/app/signup/page.tsx
 import Image from "next/image";
 import {
   UserRound,
@@ -12,6 +13,8 @@ import {
   EyeOff,
   Apple,
 } from "lucide-react";
+=======
+>>>>>>> 752a3730cdc96e0a8bbca82437808ae83c3c68d9:frontend/app/(auth)/signup/page.tsx
 import { signup as signupRequest } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 
@@ -28,8 +31,6 @@ export default function SignupPage() {
     confirmPassword: "",
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -41,10 +42,21 @@ export default function SignupPage() {
     e.preventDefault();
     setError("");
 
+    if (!form.fullName.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
+
     if (!agreedToTerms) {
       setError("You must agree to the Terms & Conditions to continue.");
       return;
@@ -53,14 +65,22 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const { data } = await signupRequest({
-        name: form.fullName,
-        email: form.email,
+        name: form.fullName.trim(),
+        email: form.email.trim(),
         password: form.password,
       });
-      login(data.user, data.token);
-      router.push("/customer/dashboard");
-    } catch {
-      setError("Sign up failed. Please check your details and try again.");
+
+      if (data?.user && data?.token) {
+        login(data.user, data.token);
+        const targetRoute = data.user?.role === "VENDOR" ? "/vendor/dashboard" : "/customer/dashboard";
+        router.push(targetRoute);
+      } else {
+        router.push("/login");
+      }
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message || "Sign up failed. Please check your details and try again.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -108,7 +128,11 @@ export default function SignupPage() {
           </p>
 
           {/* Signup Form */}
+<<<<<<< HEAD:frontend/app/signup/page.tsx
           <form onSubmit={handleSubmit} noValidate>
+=======
+          <form onSubmit={handleSubmit}>
+>>>>>>> 752a3730cdc96e0a8bbca82437808ae83c3c68d9:frontend/app/(auth)/signup/page.tsx
             {/* Full Name */}
             <div className="form-group">
               <label htmlFor="fullName">
@@ -147,6 +171,7 @@ export default function SignupPage() {
                 Create a New Password
               </label>
 
+<<<<<<< HEAD:frontend/app/signup/page.tsx
               <div className="input-wrapper">
                 <input
                   id="password"
@@ -166,6 +191,16 @@ export default function SignupPage() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+=======
+              <input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="Enter new password"
+                value={form.password}
+                onChange={handleChange("password")}
+              />
+>>>>>>> 752a3730cdc96e0a8bbca82437808ae83c3c68d9:frontend/app/(auth)/signup/page.tsx
             </div>
 
             {/* Confirm Password */}
@@ -174,6 +209,7 @@ export default function SignupPage() {
                 Confirm New Password
               </label>
 
+<<<<<<< HEAD:frontend/app/signup/page.tsx
               <div className="input-wrapper">
                 <input
                   id="confirmPassword"
@@ -193,6 +229,16 @@ export default function SignupPage() {
                   {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+=======
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                placeholder="Re-type your password to confirm"
+                value={form.confirmPassword}
+                onChange={handleChange("confirmPassword")}
+              />
+>>>>>>> 752a3730cdc96e0a8bbca82437808ae83c3c68d9:frontend/app/(auth)/signup/page.tsx
             </div>
 
             {/* Terms */}
@@ -210,11 +256,23 @@ export default function SignupPage() {
               </label>
             </div>
 
+<<<<<<< HEAD:frontend/app/signup/page.tsx
             {error && <p className="signup-error">{error}</p>}
 
             {/* Button */}
             <button type="submit" className="get-started" disabled={loading}>
               {loading ? "Creating account..." : "Get Started ↗"}
+=======
+            {error && <p className="text-sm text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200 mt-2">{error}</p>}
+
+            {/* Button */}
+            <button
+              type="submit"
+              className="get-started"
+              disabled={loading}
+            >
+              {loading ? "Creating Account..." : "Get Started ↗"}
+>>>>>>> 752a3730cdc96e0a8bbca82437808ae83c3c68d9:frontend/app/(auth)/signup/page.tsx
             </button>
           </form>
         </div>

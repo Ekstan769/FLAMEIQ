@@ -43,12 +43,13 @@ Environment
 - Required values:
   - `PORT`
   - `DATABASE_URL`
-  - `ENABLE_CRON_JOB`
-  - `EMAIL_HOST`
-  - `EMAIL_PORT`
-  - `EMAIL_USER`
-  - `EMAIL_PASS`
+  - `JWT_SECRET`
+  - `SENDLIB_API_KEY`
+  - `SENDLIB_FROM_EMAIL`
+  - `CLOUDINARY_CLOUD_NAME`
+  - `CLOUDINARY_API_KEY`
+  - `CLOUDINARY_API_SECRET`
 
 Notes
-- `ENABLE_CRON_JOB` can be set to `false` locally if you want to disable scheduled prediction jobs.
-- `EMAIL_HOST` and `EMAIL_PORT` are used by `nodemailer` in `src/services/emailService.ts`.
+- `ENABLE_CRON_JOB` can be set to `false` locally if you want to disable scheduled prediction jobs (if applicable).
+- The email service now uses `sendlib` via `SENDLIB_API_KEY` and `SENDLIB_FROM_EMAIL`.
