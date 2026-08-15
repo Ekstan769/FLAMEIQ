@@ -55,12 +55,12 @@ jobs:
 
       - name: Run typecheck
         run: pnpm run typecheck
-        working-directory: backend
+        working-directory: ./backend
 
       - name: Build project
         run: pnpm run build
-        working-directory: backend
+        working-directory: ./backend
         
       - name: Run tests
         run: pnpm run test
-        working-directory: backend
+        working-directory: ./backend
