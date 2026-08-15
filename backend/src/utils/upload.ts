@@ -1,4 +1,4 @@
-import { v2 as cloudinary } from 'cloudinary';
+import { v2 as cloudinary, UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
 import { logger } from './logger.js';
 
 cloudinary.config({
@@ -21,13 +21,13 @@ export const uploadToCloudinary = async (fileBuffer: Buffer, folder: string): Pr
         folder: folder,
         resource_type: 'auto',
       },
-      (error, result) => {
+      (error: UploadApiErrorResponse | undefined, result: UploadApiResponse | undefined) => {
         if (error) {
           logger.error({ err: error }, 'Cloudinary upload failed');
           return reject(new Error('Failed to upload file.'));
         }
         resolve(result!.secure_url);
-      }
+      },
     );
     uploadStream.end(fileBuffer);
   });
