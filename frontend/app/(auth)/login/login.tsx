@@ -88,7 +88,7 @@ export default function Login() {
           <Image src="/images/logo.png" alt="FlameIQ logo" width={140} height={34} />
         </Link>
 
-        {/* <div className="auth-header-right">
+        <div className="auth-header-right">
           <span>Don&apos;t have an account?</span>
 
           <Link
@@ -97,7 +97,7 @@ export default function Login() {
           >
             Sign Up
           </Link>
-        </div> */}
+        </div>
 
       </header>
 
