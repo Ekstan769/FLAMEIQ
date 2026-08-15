@@ -20,9 +20,12 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
-      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_SECRET }}
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
       SENDLIB_API_KEY: ${{ secrets.SENDLIB_API_KEY }}
       SENDLIB_FROM_EMAIL: ${{ secrets.SENDLIB_FROM_EMAIL }}
+      PORT: 3000
+      ENABLE_CRON_JOB: "true"
 
     steps:
       - name: Checkout repository
@@ -42,25 +45,25 @@ jobs:
           cache-dependency-path: backend/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: backend
+        # Run install from the root, but filter for the backend workspace
+        run: pnpm install --frozen-lockfile --filter backend
 
       - name: Generate Prisma client
         run: pnpm run prisma:generate
         working-directory: backend
 
       - name: Run lint
-        run: pnpm run lint
+        run: pnpm run lint --if-present
         working-directory: backend
 
       - name: Run typecheck
         run: pnpm run typecheck
-        working-directory: ./backend
+        working-directory: backend
 
       - name: Build project
         run: pnpm run build
-        working-directory: ./backend
+        working-directory: backend
         
       - name: Run tests
         run: pnpm run test
-        working-directory: ./backend
+        working-directory: backend
