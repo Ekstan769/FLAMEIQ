@@ -15,6 +15,8 @@ enum TxType {
   WITHDRAWAL
   PAYMENT
   REFUND
+  WALLET_PAY // Payment made from user's in-app wallet balance
+  WALLET_FUND // User topping up their wallet via external gateway
 }
 
 enum TxStatus {
@@ -31,12 +33,14 @@ enum PayoutStatus {
 }
 
 enum OrderStatus {
-  PENDING
-  ACCEPTED
-  ON_ROUTE
-  DELIVERED
-  REJECTED
-  CANCELLED
+  PAYMENT_PENDING // Order placed but awaiting payment confirmation
+  PENDING         // Payment confirmed; awaiting vendor action
+  ACCEPTED        // Vendor accepted (with before/after images)
+  ON_ROUTE        // Vendor dispatched the order
+  DELIVERED       // Vendor marked as delivered; awaiting buyer confirmation
+  CONFIRMED       // Buyer confirmed receipt; session closed, payout triggered
+  REJECTED        // Vendor rejected; refund initiated
+  CANCELLED       // Buyer cancelled before payment confirmed
 }
 
 enum OrderType {
@@ -87,19 +91,19 @@ model User {
   updatedAt DateTime   @updatedAt
 
   profile          Profile?
-  notifications    Notification[] // The relation name on the User model should be plural
+  notifications    Notification[]
   gasPredictions   GasPrediction[]
   supportTickets   SupportTicket[]
   loginHistories   LoginHistory[]
-  transactions     Transaction[]
   otpVerifications OtpVerification[]
   authoredReviews  Review[]          @relation("AuthoredReviews")
   receivedReviews  Review[]          @relation("ReceivedReviews")
-  orders           Order[]           @relation("UserOrders") // Added for Order.user relation
-  vendorOrders     Order[]           @relation("VendorOrders") // Added for Order.vendor relation
-  sourceTransactions Transaction[] @relation("SourceTransactions")
+  orders           Order[]           @relation("UserOrders")
+  vendorOrders     Order[]           @relation("VendorOrders")
+  sourceTransactions      Transaction[] @relation("SourceTransactions")
   destinationTransactions Transaction[] @relation("DestinationTransactions")
   cylinders        Cylinder[]
+  payouts          Payout[]          @relation("VendorPayouts")
 
   @@index([email])
 }
@@ -116,6 +120,7 @@ model Profile {
   latitude     Float?
   longitude    Float?
   isVerified   Boolean     @default(false)
+  walletBalance Decimal    @default(0.00) // In-app wallet balance
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   deletedAt    DateTime?
@@ -163,12 +168,14 @@ model GasPrediction {
 }
 
 model Notification {
-  id        String   @id @default(uuid()) // Changed to UUID
-  userId    String // Changed to String
-  user      User     @relation(fields: [userId], references: [id])
-  message   String
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  userId       String   // The user who receives this notification
+  user         User     @relation(fields: [userId], references: [id])
+  title        String   @default("Notification")
+  message      String
+  type         String   @default("info") // info | success | warning | error
+  isRead       Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
   @@index([userId])
 }
@@ -228,13 +235,15 @@ model Order {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  cylinderId String?
-  cylinder   Cylinder? @relation(fields: [cylinderId], references: [id], onDelete: SetNull)
+  cylinderId      String?
+  cylinder        Cylinder? @relation(fields: [cylinderId], references: [id], onDelete: SetNull)
+  beforeFillImage String?   // Cloudinary URL — cylinder before filling (uploaded by vendor on accept)
+  afterFillImage  String?   // Cloudinary URL — cylinder after filling (uploaded by vendor on accept)
 
-  items       OrderItem[]
-  review      Review?
+  items        OrderItem[]
+  review       Review?
   transactions Transaction[]
-  payout      Payout? // An order has one associated payout to the vendor
+  payout       Payout? // An order has one associated payout to the vendor
 
   @@index([userId])
   @@index([vendorId])
@@ -245,7 +254,7 @@ model Payout {
   orderId   String   @unique
   order     Order    @relation(fields: [orderId], references: [id])
   vendorId  String
-  vendor    User     @relation(fields: [vendorId], references: [id], onDelete: NoAction)
+  vendor    User     @relation("VendorPayouts", fields: [vendorId], references: [id], onDelete: NoAction)
   amount    Decimal // The net amount to be paid to the vendor
   status    PayoutStatus @default(PENDING)
   gatewayReference String? @unique // The reference for the transfer from the payment gateway
