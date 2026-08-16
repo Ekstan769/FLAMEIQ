@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { prisma } from '@/db/prisma.js';
 import { logger } from '@/utils/logger.js';
-import { CylinderSize } from '@prisma/client';
+import { CylinderSize } from '../generated/prisma/client.js'
+import { registerCylinderSchema } from '@/validators/cylinderValidators.js';
 
 /**
  * Get all cylinders for the authenticated user.
@@ -24,6 +25,10 @@ export const getCylinders = async (req: Request, res: Response) => {
  */
 export const registerCylinder = async (req: Request, res: Response) => {
   const userId = req.user!.id;
+  const result = registerCylinderSchema.safeParse(req.body);
+  if (!reult.success) {
+    return res.status(400).json({ success: false, error: result .error.flatten().fieldErrors });
+  }
   const { size, serialNumber, nickname } = req.body;
 
   if (!size) {

@@ -8,6 +8,7 @@ import { logger } from '@/utils/logger.js';
 import { generateOtp, getOtpExpiration, hashOtp } from "@/utils/otp.js";
 import { emailService } from "../services/emailService.js";
 //import { uploadToCloudinary } from "../utils/upload";
+import { signupSchema, loginSchema, verifyOtpSchema } from "../validators/authValidators.js";
 
 
 
@@ -75,7 +76,11 @@ export const authorizeVendor = async (req: Request, res: Response, next: NextFun
 
 
 export const signUp = async(req: Request, res: Response) => {
-    const{name, email, password} = req.body // stores input from body
+    const result = signupSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.flatten().fieldErrors });
+    }
+    const { name, email, password } = result.data;
     try{
         if(!name||!email||!password)
             /*if no first name or no last name or no email or no password run the next code:-*/
@@ -151,8 +156,11 @@ export const signUp = async(req: Request, res: Response) => {
 }
 
 export const verifyOtp = async (req: Request, res: Response) => {
-  const { userId, otp } = req.body;
-
+  const result = verifyOtpSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.flatten().fieldErrors });
+    }
+    const { email, otp } = result.data;
   try {
     if (!userId || !otp) {
       return res.status(400).json({
@@ -231,7 +239,11 @@ export const verifyOtp = async (req: Request, res: Response) => {
 
 
 export const signIn = async (req: Request, res: Response) =>{
-  const {email, password}= req.body;
+  const result = loginSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.flatten().fieldErrors });
+    }
+    const { email, password } = result.data;
   try{
     if (!email||!password){
       return res.status(400).json({

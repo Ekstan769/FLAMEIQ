@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { prisma } from '@/db/prisma.js';
 import { logger } from '@/utils/logger.js';
-import { OrderStatus, TxStatus } from '@prisma/client';
+import { OrderStatus, TxStatus } from '../generated/prisma/client.js';
 
 /**
  * Handles incoming webhooks from Flutterwave.

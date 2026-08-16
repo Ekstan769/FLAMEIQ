@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockDeep, mockReset } from 'vitest-mock-extended';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '../generated/prisma/client.js';
 import { Request, Response } from 'express';
 
 import { getCylinders, registerCylinder, deleteCylinder } from './cylinderController.js';
