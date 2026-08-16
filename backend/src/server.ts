@@ -9,8 +9,8 @@ import { notificationService } from './services/notificationService.js'
 import { predictionJob } from './jobs/predictionJob.js';
 import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, forgotPassword, getMe, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
 import { uploadProfilePicture } from './controllers/uploadController.js';
-import { handleFlutterwaveWebhook } from './controllers/paymentController.js';
 import orderRoutes from './routes/orderRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
 import cylinderRoutes from './routes/cylinderRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import ipTracker from './utils/ipTracker.js';
@@ -266,49 +266,7 @@ app.get('/api/users', authenticate, authorizeAdmin, getUsers);
  */
 app.delete('/api/users/:id', authenticate, authorizeAdmin, deleteUsers);
 
-// --- Server-Sent Events (SSE) Endpoint for Pop-up Notifications ---
-/**
- * @swagger
- * /api/notifications/stream:
- *   get:
- *     summary: Establishes a Server-Sent Events (SSE) connection for real-time notifications.
- *     tags: [Notifications]
- *     parameters:
- *       - in: query
- *         name: clientId
- *         schema:
- *           type: string
- *         required: true
- *         description: A unique identifier for the client establishing the connection.
- *     responses:
- *       200:
- *         description: SSE connection established. Events will be streamed.
- *         content:
- *           text/event-stream:
- *             schema:
- *               type: string
- *               example: "data: {\"title\":\"New Order Received\",\"message\":\"You have a new standard order! Total: $120.00\",\"type\":\"info\",\"timestamp\":\"2023-10-27T10:00:00.000Z\"}\n\n"
- *       400:
- *         description: clientId is required.
- */
-app.get('/api/notifications/stream', (req, res) => {
-  const clientId = req.query.clientId as string;
-  if (!clientId) {
-    return res.status(400).json({ error: 'clientId is required' });
-  }
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  // Flush headers immediately
-  res.flushHeaders();
-
-  // Keep connection alive
-  res.write(': keep-alive\n\n');
-
-  notificationService.addClient(res);
-});
+// NOTE: SSE notification stream is registered below alongside payment routes (authenticated, per-user)
 
 // --- Order Routes ---
 /**
@@ -646,40 +604,56 @@ app.use('/api/cylinders', cylinderRoutes);
  */
 app.use('/api/reviews', reviewRoutes);
 
-// --- Payment Webhook Route ---
-/**
- * @swagger
- * tags:
- *   name: Payments
- *   description: API for handling payment gateway webhooks
- */
+// --- Payment Routes (initiate, verify, wallet, webhook) ---
+app.use('/api/payments', paymentRoutes);
 
-/**
- * @swagger
- * /api/payments/webhook:
- *   post:
- *     summary: Handles payment confirmation webhooks from Flutterwave
- *     tags: [Payments]
- *     description: This endpoint receives webhook events from Flutterwave to confirm payment status. It should not be called directly by a client.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               event:
- *                 type: string
- *                 example: charge.completed
- *               data:
- *                 type: object
- *     responses:
- *       200:
- *         description: Webhook received and acknowledged.
- *       401:
- *         description: Invalid webhook signature.
- */
-app.post('/api/payments/webhook', handleFlutterwaveWebhook);
+// --- Real-time Notifications (Server-Sent Events) ---
+// GET /api/notifications/stream — authenticated users subscribe to their own event stream
+app.get('/api/notifications/stream', authenticate, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable Nginx buffering
+  res.flushHeaders();
+
+  const userId = req.user!.id;
+  notificationService.addClient(res, userId);
+
+  // Send a heartbeat every 30s to keep the connection alive
+  const heartbeat = setInterval(() => {
+    res.write(': heartbeat\n\n');
+  }, 30000);
+
+  res.on('close', () => clearInterval(heartbeat));
+});
+
+// GET /api/notifications — fetch persisted notifications for the user
+app.get('/api/notifications', authenticate, async (req, res) => {
+  try {
+    const { prisma } = await import('./db/prisma.js');
+    const userId = req.user!.id;
+    const notifications = await prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    return res.json({ success: true, data: notifications });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Failed to fetch notifications.' });
+  }
+});
+
+// PATCH /api/notifications/:id/read — mark a notification as read
+app.patch('/api/notifications/:id/read', authenticate, async (req, res) => {
+  try {
+    const { prisma } = await import('./db/prisma.js');
+    const { id } = req.params;
+    await prisma.notification.update({ where: { id }, data: { isRead: true } });
+    return res.json({ success: true });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Failed to mark notification as read.' });
+  }
+});
 
 const PORT = process.env.PORT || 4000
 
