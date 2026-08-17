@@ -42,11 +42,9 @@ export default function CustomerDashboardPage() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
           <SmartRefillGauge />
-        </div>
-        <ActiveDelivery />
+          <ActiveDelivery />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-3">
