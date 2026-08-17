@@ -1,6 +1,7 @@
-import { Order, OrderItem, OrderStatus, OrderType, Prisma, TxStatus, TxType } from '@prisma/client';
+import { Order, OrderItem, OrderStatus, OrderType, PayoutStatus, Prisma, TxStatus, TxType } from '../generated/prisma/client.js';
 import { prisma } from '../db/prisma.js';
 import { notificationService } from './notificationService.js';
+import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import {
   OrderNotFoundError,
@@ -9,14 +10,14 @@ import {
   BadRequestError,
   AppError,
 } from '../utils/errors.js';
-import { paymentService } from './paymentService.js';
+
 
 // Use a type for creation that doesn't require all Order fields
 type OrderItemCreateInput = Omit<OrderItem, 'id' | 'orderId' | 'price'> & {
   price: number | Prisma.Decimal;
 };
 
-const PLATFORM_COMMISSION_RATE = parseFloat(process.env.PLATFORM_COMMISSION_RATE ?? '0.10');
+const PLATFORM_COMMISSION_RATE = config.platformCommissionRate;
 
 class OrderService {
   /**
@@ -130,7 +131,7 @@ class OrderService {
 
     // Can only accept a PENDING (paid) order
     if (order.status !== OrderStatus.PENDING) {
-      throw new InvalidOrderStatusError(
+      throw new InvalidOrderStatusError( // This logic is now correct with the updated status flow
         `Order cannot be accepted in ${order.status} status. Payment must be confirmed first.`,
       );
     }
@@ -266,7 +267,7 @@ class OrderService {
 
     // Prompt buyer to confirm receipt
     await notificationService.sendToUser(order.userId, {
-      title: 'Order Delivered! ✅',
+      title: 'Order Delivered! ',
       message: `Your order #${orderId.substring(0, 8)} has been delivered. Please confirm receipt to release payment to the vendor.`,
       type: 'success',
     });
@@ -303,13 +304,10 @@ class OrderService {
       type: 'success',
     });
 
-    // Trigger vendor payout asynchronously
-    setImmediate(async () => {
-      try {
-        await paymentService.triggerVendorPayout(orderId);
-      } catch (err) {
-        logger.error({ err }, `Payout trigger failed for order ${orderId}`);
-      }
+    // Mark the payout as READY_FOR_PROCESSING for the background job
+    await prisma.payout.update({
+      where: { orderId: order.id },
+      data: { status: PayoutStatus.READY_FOR_PROCESSING },
     });
 
     return updatedOrder;
@@ -367,6 +365,26 @@ class OrderService {
     return prisma.order.findMany({
       where: { userId },
       include: { items: true, transactions: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Get all orders for a vendor.
+   */
+  public async getOrdersForVendor(vendorId: string): Promise<Order[]> {
+    return prisma.order.findMany({
+      where: { vendorId },
+      include: {
+        items: true,
+        user: {
+          select: {
+            name: true,
+            profile: { select: { phone: true, address: true, profilePic: true } },
+          },
+        },
+        transactions: { select: { status: true, type: true, amount: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

@@ -28,6 +28,7 @@ enum TxStatus {
 
 enum PayoutStatus {
   PENDING // Payout is due but not yet sent to the payment gateway
+  READY_FOR_PROCESSING // Buyer confirmed delivery; queued for disbursement
   PROCESSING // Payout has been initiated with the payment gateway
   PAID // Payout confirmed as successful
   FAILED // Payout failed
@@ -35,13 +36,13 @@ enum PayoutStatus {
 
 enum OrderStatus {
   PAYMENT_PENDING // Order placed but awaiting payment confirmation
-  PENDING         // Payment confirmed; awaiting vendor action
-  ACCEPTED        // Vendor accepted (with before/after images)
-  ON_ROUTE        // Vendor dispatched the order
-  DELIVERED       // Vendor marked as delivered; awaiting buyer confirmation
-  CONFIRMED       // Buyer confirmed receipt; session closed, payout triggered
-  REJECTED        // Vendor rejected; refund initiated
-  CANCELLED       // Buyer cancelled before payment confirmed
+  PENDING // Payment confirmed; awaiting vendor action
+  ACCEPTED // Vendor accepted (with before/after images)
+  ON_ROUTE // Vendor dispatched the order
+  DELIVERED // Vendor marked as delivered; awaiting buyer confirmation
+  CONFIRMED // Buyer confirmed receipt; session closed, payout triggered
+  REJECTED // Vendor rejected; refund initiated
+  CANCELLED // Buyer cancelled before payment confirmed
 }
 
 enum OrderType {
@@ -91,40 +92,43 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-  profile          Profile?
-  notifications    Notification[] // The relation name on the User model should be plural
-  gasPredictions   GasPrediction[]
-  supportTickets   SupportTicket[]
-  loginHistories   LoginHistory[]
-  transactions     Transaction[]
-  otpVerifications OtpVerification[]
-  authoredReviews  Review[]          @relation("AuthoredReviews")
-  receivedReviews  Review[]          @relation("ReceivedReviews")
-  orders           Order[]           @relation("UserOrders") // Added for Order.user relation
-  vendorOrders     Order[]           @relation("VendorOrders") // Added for Order.vendor relation
-  sourceTransactions Transaction[] @relation("SourceTransactions")
-  destinationTransactions Transaction[] @relation("DestinationTransactions")
-  cylinders        Cylinder[]
+  profile                 Profile?
+  notifications           Notification[] // The relation name on the User model should be plural
+  gasPredictions          GasPrediction[]
+  supportTickets          SupportTicket[]
+  loginHistories          LoginHistory[]
+  transactions            Transaction[]
+  otpVerifications        OtpVerification[]
+  authoredReviews         Review[]          @relation("AuthoredReviews")
+  receivedReviews         Review[]          @relation("ReceivedReviews")
+  orders                  Order[]           @relation("UserOrders") // Added for Order.user relation
+  vendorOrders            Order[]           @relation("VendorOrders") // Added for Order.vendor relation
+  sourceTransactions      Transaction[]     @relation("SourceTransactions")
+  destinationTransactions Transaction[]     @relation("DestinationTransactions")
+  cylinders               Cylinder[]
+  payouts                 Payout[]
 
   @@index([email])
 }
 
 model Profile {
-  id           String      @id @default(uuid()) // Changed to UUID
-  userId       String      @unique // Changed to String
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  profileType  ProfileType @default(USER)
-  businessName String?
-  phone        String?
-  profilePic   String?
-  address      String?
-  latitude     Float?
-  longitude    Float?
-  isVerified   Boolean     @default(false)
-  walletBalance Decimal    @default(0.00) // In-app wallet balance
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  deletedAt    DateTime?
+  id                String      @id @default(uuid()) // Changed to UUID
+  userId            String      @unique // Changed to String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileType       ProfileType @default(USER)
+  businessName      String?
+  phone             String?
+  profilePic        String?
+  address           String?
+  latitude          Float?
+  longitude         Float?
+  isVerified        Boolean     @default(false)
+  walletBalance     Decimal     @default(0.00) // In-app wallet balance
+  bankCode          String?
+  bankAccountNumber String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  deletedAt         DateTime?
 }
 
 // - OTP Verification -
@@ -169,14 +173,14 @@ model GasPrediction {
 }
 
 model Notification {
-  id           String   @id @default(uuid())
-  userId       String   // The user who receives this notification
-  user         User     @relation(fields: [userId], references: [id])
-  title        String   @default("Notification")
-  message      String
-  type         String   @default("info") // info | success | warning | error
-  isRead       Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  id        String   @id @default(uuid())
+  userId    String // The user who receives this notification
+  user      User     @relation(fields: [userId], references: [id])
+  title     String   @default("Notification")
+  message   String
+  type      String   @default("info") // info | success | warning | error
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@index([userId])
 }
@@ -238,11 +242,13 @@ model Order {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  cylinderId String?
-  cylinder   Cylinder? @relation(fields: [cylinderId], references: [id], onDelete: SetNull)
+  cylinderId      String?
+  cylinder        Cylinder? @relation(fields: [cylinderId], references: [id], onDelete: SetNull)
+  beforeFillImage String?
+  afterFillImage  String?
 
-  items       OrderItem[]
-  review      Review?
+  items        OrderItem[]
+  review       Review?
   transactions Transaction[]
   payout       Payout? // An order has one associated payout to the vendor
 
@@ -251,16 +257,18 @@ model Order {
 }
 
 model Payout {
-  id        String   @id @default(uuid())
-  orderId   String   @unique
-  order     Order    @relation(fields: [orderId], references: [id])
-  vendorId  String
-  vendor    User     @relation(fields: [vendorId], references: [id], onDelete: NoAction)
-  amount    Decimal // The net amount to be paid to the vendor
-  status    PayoutStatus @default(PENDING)
-  gatewayReference String? @unique // The reference for the transfer from the payment gateway
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String       @id @default(uuid())
+  orderId          String       @unique
+  order            Order        @relation(fields: [orderId], references: [id])
+  vendorId         String
+  vendor           User         @relation(fields: [vendorId], references: [id], onDelete: NoAction)
+  amount           Decimal // The net amount to be paid to the vendor
+  status           PayoutStatus @default(PENDING)
+  gatewayReference String?      @unique // The reference for the transfer from the payment gateway
+  reference        String       @unique @default(uuid())
+  failureReason    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 }
 
 model OrderItem {

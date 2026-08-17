@@ -2,9 +2,10 @@ import { Request, Response } from 'express';
 import { orderService } from '../services/orderService.js';
 import { logger } from '../utils/logger.js';
 import { AppError } from '../utils/errors.js';
-import { ProfileType } from '@prisma/client';
+import { ProfileType } from '../generated/prisma/client.js';
 import { prisma } from '@/db/prisma.js';
-
+import { createOrderSchema } from '../validators/orderValidators.js';
+import { uploadToCloudinary } from '../utils/upload.js';
 /**
  * Handles the creation of a new order.
  * Order starts at PAYMENT_PENDING until payment is confirmed.
@@ -41,15 +42,7 @@ export const getOrders = async (req: Request, res: Response): Promise<Response> 
 
     let orders;
     if (profileType === ProfileType.VENDOR) {
-      orders = await prisma.order.findMany({
-        where: { vendorId: userId },
-        include: {
-          items: true,
-          user: { select: { name: true, profile: { select: { phone: true, address: true, profilePic: true } } } },
-          transactions: { select: { status: true, type: true, amount: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+      orders = await orderService.getOrdersForVendor(userId);
     } else {
       orders = await orderService.getOrderHistory(userId);
     }
@@ -207,6 +200,7 @@ export const confirmDelivery = async (req: Request, res: Response): Promise<Resp
       message: 'Delivery confirmed. The vendor payout has been initiated.',
       data: updatedOrder,
     });
+
   } catch (error) {
     if (error instanceof AppError) {
       return res.status(error.statusCode).json({ success: false, message: error.message });

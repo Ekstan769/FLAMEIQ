@@ -66,15 +66,15 @@ This flow describes how an authenticated user places an order.
     *   After the user completes the payment, the payment gateway (e.g., Flutterwave) sends a webhook event to `/api/payments/webhook`.
     *   The backend **securely verifies the webhook signature** to ensure it's a legitimate request.
     *   If the payment was successful (`charge.completed`), the system finds the associated `Order` using the transaction reference.
-    *   The `Order` status is updated from `PENDING` to `PAID`.
+    *   The `Order` status is updated from `PAYMENT_PENDING` to `PENDING` (meaning it is paid and awaiting vendor action).
     *   The corresponding `Transaction` record is updated to `SUCCESS`.
     *   A real-time notification is sent to the vendor via the `notificationService` (Server-Sent Events) to inform them of the new, paid order.
     *   The backend responds to the webhook with a `200 OK` status.
 
 4.  **Vendor Accepts Order**:
     *   The vendor, having received the notification, sends a `POST` request to `/api/orders/:orderId/accept`.
-    *   The backend verifies that the order status is `PAID`.
-    *   The `Order` status is updated from `PAID` to `ACCEPTED`.
+    *   The backend verifies that the order status is `PENDING`.
+    *   The `Order` status is updated from `PENDING` to `ACCEPTED`.
     *   A notification is sent to the customer confirming the vendor has accepted their order.
     *   The backend responds with the updated order object.
 

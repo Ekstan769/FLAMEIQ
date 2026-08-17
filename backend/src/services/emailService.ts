@@ -8,8 +8,8 @@ class EmailService {
    */
   public async sendEmail(to: string, subject: string, text: string, html?: string): Promise<boolean> {
     try {
-      const apiKey = process.env.SENDLIB_API_KEY;
-      const fromEmail = process.env.SENDLIB_FROM_EMAIL;
+      const apiKey = config.sendlibApiKey;
+      const fromEmail = config.sendlibFromEmail;
 
       if (!apiKey || !fromEmail) {
         logger.warn('Email service config missing! Using mock sender. Add SENDLIB_API_KEY and SENDLIB_FROM_EMAIL to .env');

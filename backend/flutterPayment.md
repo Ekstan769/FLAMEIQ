@@ -180,18 +180,24 @@ After a charge is completed (or fails), Flutterwave sends a webhook to your conf
 #### 5a. Verify the Signature
 
 1.  Get the `flutterwave-signature` value from the request headers.
-2.  Get the raw request body (as a string).
-3.  Compare the `flutterwave-signature` with your `FLUTTERWAVE_SECRET_HASH` from your environment variables.
-4.  If they do not match, **do not process the webhook**. Respond with a `401 Unauthorized` status.
-5.  If they match, proceed to process the event and respond with a `200 OK`.
+2.  Compare the `flutterwave-signature` with your `FLUTTERWAVE_SECRET_HASH` from your environment variables using a **timing-safe comparison** to prevent timing attacks.
+3.  If they do not match, **do not process the webhook**. Respond with a `401 Unauthorized` status.
+4.  If they match, proceed to process the event and respond with a `200 OK`.
 
 **Example (Express.js):**
 ```javascript
+import crypto from 'crypto';
+
 const webhookSecret = process.env.FLUTTERWAVE_SECRET_HASH;
 const signature = req.headers['flutterwave-signature'];
 
-if (signature !== webhookSecret) {
-  // This request isn't from Flutterwave. Don't process it.
+// Use a timing-safe comparison to prevent timing attacks
+const isSignatureValid = webhookSecret && signature && crypto.timingSafeEqual(
+  Buffer.from(signature),
+  Buffer.from(webhookSecret)
+);
+
+if (!isSignatureValid) {
   return res.status(401).send('Invalid signature');
 }
 

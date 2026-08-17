@@ -66,7 +66,7 @@ This document lists identified areas for improvement across the FLAMEIQ backend 
 ## 💡 Future Enhancements
 
 -   [ ] **Implement a Payout Processing Service:**
-    -   **Description:** Create a background job (e.g., using a cron scheduler like `node-cron`) that periodically queries for `Payout` records with `PENDING` status. This job would then call the Flutterwave API to process the transfers and update the payout status to `PAID` or `FAILED`.
+    -   **Description:** Implemented a background job using `node-cron` that periodically queries for `Payout` records with `READY_FOR_PROCESSING` status. This job calls the Flutterwave API to process transfers and updates the payout status to `PROCESSING`, `PAID`, or `FAILED` based on gateway responses and webhooks.
 
 -   [ ] **Refactor Notification Service:**
     -   **Description:** The current `notificationService` is a simple in-memory broadcaster. For a production system that needs to handle multiple server instances or guarantee delivery, this should be refactored to use a more robust backend like Redis Pub/Sub.

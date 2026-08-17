@@ -1,23 +1,25 @@
 import './types/express.d.js';
-
 import express from 'express'
 import { corsConfig } from './middleware/corsConfig.js';
 import dotenv from 'dotenv'
+import { config } from './config/index.js';
 import { fileURLToPath } from 'url'
 import multer from 'multer';
 import { notificationService } from './services/notificationService.js'
 import { predictionJob } from './jobs/predictionJob.js';
+import { payoutJob } from './jobs/payoutJob.js';
 import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, forgotPassword, getMe, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
 import { uploadProfilePicture } from './controllers/uploadController.js';
 import orderRoutes from './routes/orderRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import payoutRoutes from './routes/payoutRoutes.js';
 import cylinderRoutes from './routes/cylinderRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import ipTracker from './utils/ipTracker.js';
 import httpLogger from './utils/httpLogger.js';
 import { setupSwagger } from './config/swagger.js';
 import { generalLimiter, authLimiter } from './middleware/rateLimiter.js';
-
+// dotenv.config() is now handled by src/config/index.ts
 dotenv.config()
 
 const app = express()
@@ -604,6 +606,14 @@ app.use('/api/cylinders', cylinderRoutes);
  */
 app.use('/api/reviews', reviewRoutes);
 
+// --- Payout Routes ---
+/**
+ * @swagger
+ * tags:
+ *   name: Payouts
+ *   description: API for vendors to view their payout history
+ */
+app.use('/api/payouts', payoutRoutes);
 // --- Payment Routes (initiate, verify, wallet, webhook) ---
 app.use('/api/payments', paymentRoutes);
 
@@ -655,7 +665,7 @@ app.patch('/api/notifications/:id/read', authenticate, async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 4000
+const PORT = config.port;
 
 const isDirectRun =
   !process.argv[1] ||
@@ -665,10 +675,10 @@ const isDirectRun =
 
 if (isDirectRun) {
   // Initialize background jobs
-  predictionJob.start();
+  if (config.enablePredictionJob) predictionJob.start();
+  if (config.enablePayoutJob) payoutJob.start(); // Start the new payout job
 
   app.listen(PORT, () => {
-    // eslint-disable-next-line no-console
     console.log(`Server running on http://localhost:${PORT}`)
   })
 }

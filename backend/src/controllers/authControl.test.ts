@@ -66,7 +66,7 @@ describe('Auth Controller', () => {
       };
 
       // Mock Prisma calls
-      prismaMock.user.findFirst.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue(null);
       prismaMock.user.create.mockResolvedValue(createdUser);
       (bcrypt.hash as vi.Mock).mockResolvedValue('hashedPassword');
       (emailService.sendEmail as vi.Mock).mockResolvedValue(true);
@@ -82,8 +82,8 @@ describe('Auth Controller', () => {
 
       await signUp(mockReq, mockRes);
 
-      expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
-        where: { email: 'test@example.com', deletedAt: null },
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'test@example.com' },
       });
       expect(bcrypt.hash).toHaveBeenCalledWith('password123', 10); // For user password
       expect(prismaMock.user.create).toHaveBeenCalled(); // User created
@@ -109,7 +109,7 @@ describe('Auth Controller', () => {
     });
 
     it('should return 409 if user already exists', async () => {
-      prismaMock.user.findFirst.mockResolvedValue({ id: 'user-123' } as any);
+      prismaMock.user.findUnique.mockResolvedValue({ id: 'user-123' } as any);
 
       await signUp(mockReq, mockRes);
 
@@ -122,11 +122,11 @@ describe('Auth Controller', () => {
       await signUp(reqWithMissingFields, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(400);
-      expect(mockRes.json).toHaveBeenCalledWith({ message: 'All fields required' });
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(Object) }));
     });
 
     it('should handle database errors during user creation', async () => {
-      prismaMock.user.findFirst.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue(null);
       (bcrypt.hash as vi.Mock).mockResolvedValue('hashedPassword');
       prismaMock.user.create.mockRejectedValue(new Error('DB Error'));
 
@@ -143,7 +143,7 @@ describe('Auth Controller', () => {
   describe('verifyOtp', () => {
     const mockReq = {
       body: {
-        userId: 'user-123',
+        email: 'test@example.com',
         otp: '123456',
       },
     } as unknown as Request;
@@ -185,6 +185,7 @@ describe('Auth Controller', () => {
         createdAt: new Date(),
         usedAt: null,
       };
+      prismaMock.user.findUnique.mockResolvedValueOnce({ id: mockUser.id } as any).mockResolvedValueOnce(mockUser as any);
       prismaMock.otpVerification.findFirst.mockResolvedValue(mockOtpRecord as any);
       (bcrypt.compare as vi.Mock).mockResolvedValue(true); // OTP comparison success
 
@@ -218,7 +219,7 @@ describe('Auth Controller', () => {
       );
       expect(jwt.sign).toHaveBeenCalledWith(
         { id: mockUser.id, email: mockUser.email, role: mockUser.role },
-        'test-secret',
+        expect.any(String),
         expect.any(Object)
       );
       expect(mockRes.status).toHaveBeenCalledWith(200);
@@ -230,26 +231,25 @@ describe('Auth Controller', () => {
       });
     });
 
-    it('should return 400 if userId or otp is missing', async () => {
+    it('should return 400 if email or otp is missing', async () => {
       const reqMissingUserId = { body: { otp: '123456' } } as Request;
       await verifyOtp(reqMissingUserId, mockRes);
       expect(mockRes.status).toHaveBeenCalledWith(400);
-      expect(mockRes.json).toHaveBeenCalledWith({ success: false, message: 'User ID and OTP are required.' });
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(Object) }));
 
-      const reqMissingOtp = { body: { userId: 'user-123' } } as Request;
+      const reqMissingOtp = { body: { email: 'test@example.com' } } as Request;
       await verifyOtp(reqMissingOtp, mockRes);
       expect(mockRes.status).toHaveBeenCalledWith(400);
-      expect(mockRes.json).toHaveBeenCalledWith({ success: false, message: 'User ID and OTP are required.' });
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(Object) }));
     });
 
     it('should return 404 if user is not found', async () => {
-      // Mock no OTP record found for the user
-      prismaMock.otpVerification.findFirst.mockResolvedValue(null);
+      prismaMock.user.findUnique.mockResolvedValue(null);
 
       await verifyOtp(mockReq, mockRes);
 
-      expect(mockRes.status).toHaveBeenCalledWith(401); // Changed from 404, as no OTP record implies invalid OTP
-      expect(mockRes.json).toHaveBeenCalledWith({ success: false, message: 'Invalid OTP.' });
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+      expect(mockRes.json).toHaveBeenCalledWith({ success: false, message: 'User not found.' });
     });
 
     it('should return 401 for invalid OTP', async () => {
@@ -262,6 +262,7 @@ describe('Auth Controller', () => {
         createdAt: new Date(),
         usedAt: null,
       };
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockUser.id } as any);
       prismaMock.otpVerification.findFirst.mockResolvedValue(mockOtpRecord as any);
       (bcrypt.compare as vi.Mock).mockResolvedValue(false); // OTP comparison fails
 
@@ -272,26 +273,19 @@ describe('Auth Controller', () => {
     });
 
     it('should return 401 if OTP is already used', async () => {
-      const mockUsedOtpRecord = {
-        id: 1,
-        userId: mockUser.id,
-        codeHash: 'hashedOtp123',
-        purpose: 'REGISTRATION',
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-        createdAt: new Date(),
-        usedAt: new Date(), // Already used
-      };
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockUser.id } as any);
       // If the only OTP is already used, the findFirst query with `usedAt: null` will return null.
       prismaMock.otpVerification.findFirst.mockResolvedValue(null);
 
       await verifyOtp(mockReq, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(401);
-      expect(mockRes.json).toHaveBeenCalledWith({ success: false, message: 'Invalid OTP.' }); // Because usedAt: null is part of the query
+      expect(mockRes.json).toHaveBeenCalledWith({ success: false, message: 'Invalid or expired OTP.' }); // Because usedAt: null is part of the query
     });
 
     it('should handle database errors during verification', async () => {
       // Mock an error during the initial OTP record lookup
+      prismaMock.user.findUnique.mockResolvedValue({ id: mockUser.id } as any);
       prismaMock.otpVerification.findFirst.mockRejectedValue(new Error('DB Error'));
 
       // No need to mock user.findUnique here as the error happens earlier
@@ -396,10 +390,7 @@ describe('Auth Controller', () => {
       await signIn(reqWithMissingFields, mockRes);
 
       expect(mockRes.status).toHaveBeenCalledWith(400);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'email and password required',
-      });
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.any(Object) }));
     });
 
     it('should handle unexpected errors during sign-in', async () => {

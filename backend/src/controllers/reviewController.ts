@@ -25,8 +25,8 @@ export const createReview = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: 'You can only review your own orders.' });
     }
 
-    if (order.status !== 'DELIVERED') {
-      return res.status(400).json({ success: false, message: 'You can only review delivered orders.' });
+    if (order.status !== 'CONFIRMED') {
+      return res.status(400).json({ success: false, message: 'You can only review orders that you have confirmed as delivered.' });
     }
 
     if (order.review) {

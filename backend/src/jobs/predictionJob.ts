@@ -9,8 +9,8 @@ class PredictionJob {
     // Run every minute (you can adjust this schedule as needed)
     cron.schedule('* * * * *', async () => {
       // 1. Off-switch for easy debugging or pausing
-      if (!config.enableCronJob) {
-        logger.info('[Cron Job] Skipped - enableCronJob is false in config.');
+      if (!config.enablePredictionJob) {
+        logger.info('[Cron Job] Skipped - enablePredictionJob is false in config.');
         return;
       }
 
@@ -20,7 +20,7 @@ class PredictionJob {
         // 2. Perform actions like querying AI Data (which increments counter)
         const prediction = await aiService.processPrediction({
           id: `cron-${Date.now()}`,
-          prediction: 'Market analysis complete (cron)',
+          prediction: 'gas predictions complete',
         });
 
         // 3. Trigger a push notification to specific clients

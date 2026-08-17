@@ -8,6 +8,7 @@ import { logger } from '@/utils/logger.js';
 import { generateOtp, getOtpExpiration, hashOtp } from "@/utils/otp.js";
 import { emailService } from "../services/emailService.js";
 //import { uploadToCloudinary } from "../utils/upload";
+import { config } from '../config/index.js';
 import { signupSchema, loginSchema, verifyOtpSchema } from "../validators/authValidators.js";
 
 
@@ -23,7 +24,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
-      id: number;
+      id: string;
       role: string;
     };
 
@@ -82,22 +83,16 @@ export const signUp = async(req: Request, res: Response) => {
     }
     const { name, email, password } = result.data;
     try{
-        if(!name||!email||!password)
-            /*if no first name or no last name or no email or no password run the next code:-*/
-        {
-            return res.status(400).json({message:"All fields required"});
-        }
-
-     // 1. Check if the user already exists
+     // Checks if the user already exists
      const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() }, // Normalizing email to lowercase is highly recommended
+      where: { email: email.toLowerCase() }, // Normalizing email to lowercase is best
     });
 
     if (existingUser) {
       return res.status(409).json({ message: "User already exists" });
     }
 
-    // 2. Hash your password here before inserting (e.g., using bcrypt)
+    // Hash your password here before inserting (e.g., using bcrypt)
 
         const hashedPassword = await bcrypt.hash(password, 10); //call bcrypt to hash password and save hashed password
 
@@ -144,7 +139,7 @@ export const signUp = async(req: Request, res: Response) => {
           message: "User created successfully. Please check your email for the verification code.",
           userId: user.id,
         });
-    } catch (error: any) {
+    } catch (error: any | unknown) {
         console.error("SignUp Error Stack:", error?.stack || error);
         logger.error({ message: error?.message, stack: error?.stack }, "Sign-up process failed unexpectedly");
 
@@ -154,25 +149,76 @@ export const signUp = async(req: Request, res: Response) => {
         });
     }
 }
+export const resendOtp = async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required." });
+  }
+
+  try {
+    const normalizedEmail = String(email).toLowerCase();
+
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail, deletedAt: null },
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+    const otp = generateOtp();
+    const otpExpiresAt = getOtpExpiration();
+    const codeHash = await hashOtp(otp);
+
+    await prisma.otpVerification.updateMany({
+      where: { userId: user.id, purpose: "REGISTRATION", usedAt: null },
+      data: {
+        codeHash,
+        expiresAt: otpExpiresAt,
+        purpose: "REGISTRATION",
+      },
+    });
+    await emailService.sendEmail(
+      normalizedEmail,
+      "Your FLAMEIQ Verification Code",
+      `Welcome to FLAMEIQ! Your verification code is: ${otp}. It will expire in 10 minutes.`,
+      `<p>Welcome to FLAMEIQ! Your verification code is: <strong>${otp}</strong>. It will expire in 10 minutes.</p>`
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification code resent successfully.",
+    });
+    } catch (error) {
+    logger.error({ err: error }, "OTP resend process failed");
+    return res.status(500).json({
+      success: false,
+      message: "An unexpected error occurred during OTP resend.",
+    });
+  }
+};
 
 export const verifyOtp = async (req: Request, res: Response) => {
   const result = verifyOtpSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json({ error: result.error.flatten().fieldErrors });
-    }
-    const { email, otp } = result.data;
+  if (!result.success) {
+    return res.status(400).json({ error: result.error.flatten().fieldErrors });
+  }
+  const { email, otp } = result.data;
   try {
-    if (!userId || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID and OTP are required.",
-      });
+    // Find the user by email first
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase(), deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
     }
 
     // Find the latest valid OTP for the user and purpose
     const otpRecord = await prisma.otpVerification.findFirst({
       where: {
-        userId: userId,
+        userId: user.id,
         purpose: "REGISTRATION",
         usedAt: null, // Not yet used
         expiresAt: {
@@ -187,7 +233,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
     if (!otpRecord) {
       return res.status(401).json({
         success: false,
-        message: "Invalid OTP.",
+        message: "Invalid or expired OTP.",
       });
     }
 
@@ -209,8 +255,8 @@ export const verifyOtp = async (req: Request, res: Response) => {
     });
 
     // Fetch the user to return with the token
-    const user = await prisma.user.findUnique({
-      where: { id: userId, deletedAt: null },
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id, deletedAt: null },
       select: {
         id: true,
         name: true,
@@ -220,17 +266,17 @@ export const verifyOtp = async (req: Request, res: Response) => {
       },
     });
 
-    if (!user) { // Should not happen if otpRecord was found, but for type safety
+    if (!fullUser) { // Should not happen if user was found initially
       return res.status(404).json({ success: false, message: "User not found after OTP verification." });
     }
 
     const payload = {
-      id: user.id, email: user.email, role: user.role,
+      id: fullUser.id, email: fullUser.email, role: fullUser.role,
     };
-    const secret = process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026";
-    const token = jwt.sign(payload, secret, { expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any });
+    const secret = config.jwtSecret;
+    const token = jwt.sign(payload, secret, { expiresIn: config.jwtExpiresIn as any });
 
-    return res.status(200).json({ success: true, message: "Account verified successfully.", token, user });
+    return res.status(200).json({ success: true, message: "Account verified successfully.", token, user: fullUser });
   } catch (error) {
     logger.error({ err: error }, "OTP verification failed unexpectedly");
     return res.status(500).json({ success: false, message: "An unexpected error occurred during OTP verification." });
@@ -295,12 +341,12 @@ const payload = {
 };
 
 // 2. Pass the clean payload and cast the options
-const secret = process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026";
+const secret = config.jwtSecret;
 const token = jwt.sign(
   payload,
   secret,
   {
-    expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any
+    expiresIn: config.jwtExpiresIn as any
   }
 );
 
@@ -450,7 +496,7 @@ export const updateProfile = async (req: Request, res: Response) => {
     }
 
     const userId = req.user.id;
-    const { businessName, phone, address, isVendor, profilePic } = req.body;
+    const { businessName, phone, address, isVendor, profilePic, bankCode, bankAccountNumber } = req.body;
 
     const existingProfile = await prisma.profile.findUnique({
       where: { userId },
@@ -467,6 +513,8 @@ export const updateProfile = async (req: Request, res: Response) => {
         ...(phone !== undefined ? { phone: phone ? String(phone) : null } : {}),
         ...(address !== undefined ? { address: address ? String(address) : null } : {}),
         ...(profilePic !== undefined ? { profilePic: profilePic ? String(profilePic) : null } : {}),
+        ...(bankCode !== undefined ? { bankCode: bankCode ? String(bankCode) : null } : {}),
+        ...(bankAccountNumber !== undefined ? { bankAccountNumber: bankAccountNumber ? String(bankAccountNumber) : null } : {}),
         deletedAt: null,
       },
       create: {
@@ -476,6 +524,8 @@ export const updateProfile = async (req: Request, res: Response) => {
         phone: phone ? String(phone) : null,
         address: address ? String(address) : null,
         profilePic: profilePic ? String(profilePic) : null,
+        bankCode: bankCode ? String(bankCode) : null,
+        bankAccountNumber: bankAccountNumber ? String(bankAccountNumber) : null,
       },
     });
 
