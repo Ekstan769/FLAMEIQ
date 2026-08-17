@@ -1,87 +1,151 @@
 import { Request, Response } from 'express';
 import { orderService } from '../services/orderService.js';
 import { logger } from '../utils/logger.js';
+import { AppError } from '@/utils/errors.js';
+import { ProfileType } from '@prisma/client';
+import { prisma } from '@/db/prisma.js';
 
-export const createOrder = async (req: Request, res: Response) => {
+/**
+ * Handles the creation of a new order.
+ */
+export const createOrder = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { userId, vendorId, items, type } = req.body;
+    const userId = req.user!.id;
+    const { vendorId, items, type, cylinderId } = req.body;
 
-    if (!userId || !vendorId || !items || !type) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    const order = await orderService.createOrder(userId, vendorId, items, type, cylinderId);
+
+    return res.status(201).json({ success: true, data: order });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
     }
-
-    if (!['standard', 'quick'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid order type' });
-    }
-
-    const order = await orderService.createOrder(userId, vendorId, items, type);
-    return res.status(201).json(order);
-  } catch (error: any) {
-    logger.error({ err: error }, 'Failed to create order');
-    return res.status(500).json({ error: 'An unexpected error occurred while creating the order.' });
+    logger.error({ err: error }, 'Error creating order');
+    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
   }
 };
 
-export const cancelOrder = async (req: Request, res: Response) => {
+/**
+ * Retrieves orders for the authenticated user.
+ * If the user is a VENDOR, it fetches orders assigned to them.
+ * If the user is a regular USER, it fetches their own orders.
+ */
+export const getOrders = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { id } = req.params;
-    const { userId } = req.body;
+    const userId = req.user!.id;
+    const profileType = req.user!.profile?.profileType;
 
-    if (!userId) {
-      return res.status(400).json({ error: '`userId` is required' });
+    let orders;
+    if (profileType === ProfileType.VENDOR) {
+      // Vendor: get all orders assigned to them
+      orders = await prisma.order.findMany({
+        where: { vendorId: userId },
+        include: { items: true, user: { select: { name: true, profile: true } } },
+        orderBy: { createdAt: 'desc' },
+      });
+    } else {
+      // Customer: get their order history
+      orders = await orderService.getOrderHistory(userId);
     }
 
-    const order = await orderService.cancelOrder(id, userId);
-    return res.json(order);
-  } catch (error: any) {
-    logger.error({ err: error, orderId: req.params.id }, 'Failed to cancel order');
-    return res.status(500).json({ error: 'An unexpected error occurred while canceling the order.' });
+    return res.status(200).json({ success: true, data: orders });
+  } catch (error) {
+    logger.error({ err: error }, 'Error fetching orders');
+    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
   }
 };
 
-export const acceptOrder = async (req: Request, res: Response) => {
+/**
+ * Handles a user cancelling their own order.
+ */
+export const cancelOrder = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { id } = req.params;
-    const { vendorId } = req.body;
+    const { id: orderId } = req.params;
+    const userId = req.user!.id;
 
-    if (!vendorId) {
-      return res.status(400).json({ error: '`vendorId` is required' });
+    const updatedOrder = await orderService.cancelOrder(orderId, userId);
+    return res.status(200).json({ success: true, data: updatedOrder });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
     }
-
-    const order = await orderService.acceptOrder(id, vendorId);
-    return res.json(order);
-  } catch (error: any) {
-    logger.error({ err: error, orderId: req.params.id }, 'Failed to accept order');
-    return res.status(500).json({ error: 'An unexpected error occurred while accepting the order.' });
+    logger.error({ err: error }, 'Error cancelling order');
+    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
   }
 };
 
-export const getActiveOrders = async (req: Request, res: Response) => {
+/**
+ * Handles a vendor accepting an order.
+ */
+export const acceptOrder = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const userId = req.query.userId as string;
+    const { id: orderId } = req.params;
+    const vendorId = req.user!.id;
 
-    if (!userId) {
-      return res.status(400).json({ error: '`userId` query parameter is required' });
+    const updatedOrder = await orderService.acceptOrder(orderId, vendorId);
+    return res.status(200).json({ success: true, data: updatedOrder });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
     }
-
-    const orders = await orderService.getActiveOrders(userId);
-    return res.json(orders);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    logger.error({ err: error }, 'Error accepting order');
+    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
   }
 };
 
-export const getOrderHistory = (req: Request, res: Response) => {
+/**
+ * Handles a vendor marking an order as "On Route".
+ */
+export const setOrderOnRoute = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const userId = req.query.userId as string; // Note: This should be async if orderService is
+    const { id: orderId } = req.params;
+    const vendorId = req.user!.id;
 
-    if (!userId) {
-      return res.status(400).json({ error: '`userId` query parameter is required' });
+    const updatedOrder = await orderService.markOrderAsOnRoute(orderId, vendorId);
+    return res.status(200).json({ success: true, data: updatedOrder });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
     }
+    logger.error({ err: error }, 'Error setting order on route');
+    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+  }
+};
 
-    const orders = orderService.getOrderHistory(userId);
-    return res.json(orders);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+/**
+ * Handles a vendor marking an order as "Delivered".
+ */
+export const setOrderDelivered = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id: orderId } = req.params;
+    const vendorId = req.user!.id;
+
+    const updatedOrder = await orderService.markOrderAsDelivered(orderId, vendorId);
+    return res.status(200).json({ success: true, data: updatedOrder });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    logger.error({ err: error }, 'Error setting order as delivered');
+    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
+  }
+};
+
+/**
+ * Handles a vendor rejecting an order.
+ */
+export const rejectOrder = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id: orderId } = req.params;
+    const vendorId = req.user!.id;
+
+    const updatedOrder = await orderService.rejectOrder(orderId, vendorId);
+    return res.status(200).json({ success: true, data: updatedOrder });
+  } catch (error) {
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+    logger.error({ err: error }, 'Error rejecting order');
+    return res.status(500).json({ success: false, message: 'An internal server error occurred.' });
   }
 };

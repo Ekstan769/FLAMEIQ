@@ -4,14 +4,7 @@ import { useState, FormEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  UserRound,
-  Mail,
-  LockKeyhole,
-  Eye,
-  EyeOff,
-  Apple,
-} from "lucide-react";
+import { UserRound, Eye, EyeOff } from "lucide-react";
 import { signup as signupRequest } from "@/services/authService";
 import { useAuth } from "@/context/AuthContext";
 
@@ -28,10 +21,10 @@ export default function SignupPage() {
     confirmPassword: "",
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange =
     (field: keyof typeof form) => (e: ChangeEvent<HTMLInputElement>) =>
@@ -41,10 +34,21 @@ export default function SignupPage() {
     e.preventDefault();
     setError("");
 
+    if (!form.fullName.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
+      setError("Please fill in all fields.");
+      return;
+    }
+
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
+
     if (!agreedToTerms) {
       setError("You must agree to the Terms & Conditions to continue.");
       return;
@@ -53,14 +57,21 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const { data } = await signupRequest({
-        name: form.fullName,
-        email: form.email,
+        name: form.fullName.trim(),
+        email: form.email.trim(),
         password: form.password,
       });
-      login(data.user, data.token);
-      router.push("/customer/dashboard");
-    } catch {
-      setError("Sign up failed. Please check your details and try again.");
+
+      if (data?.user && data?.token) {
+        login(data.user, data.token);
+        const targetRoute = data.user?.role === "VENDOR" ? "/vendor/dashboard" : "/customer/dashboard";
+        router.push(targetRoute);
+      } else {
+        router.push("/login");
+      }
+    } catch (err: any) {
+      const message = err?.response?.data?.message || "Sign up failed. Please check your details and try again.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -68,7 +79,6 @@ export default function SignupPage() {
 
   return (
     <main className="signup-page">
-      {/* Header */}
       <header className="signup-header">
         <Link href="/" className="logo">
           <Image src="/images/logo.png" alt="FlameIQ logo" width={140} height={34} />
@@ -76,21 +86,13 @@ export default function SignupPage() {
 
         <div className="login-link">
           <span>Already have an account?</span>
-
-          <Link href="/login">
-            Login
-          </Link>
+          <Link href="/login">Login</Link>
         </div>
       </header>
 
-      {/* Signup Section */}
       <section className="signup-section">
-        {/* Background Image */}
         <div className="signup-background">
-          <img
-            src="/images/Heroflamee.png"
-            alt="FlameIQ gas cylinder and mobile application"
-          />
+          <img src="/images/Heroflamee.png" alt="FlameIQ gas cylinder and mobile application" />
         </div>
 
         <div className="signup-form-container">
@@ -100,21 +102,12 @@ export default function SignupPage() {
             </div>
           </div>
 
-          {/* Heading */}
           <h1>Create Your Account</h1>
+          <p>Input your details to create a new account.</p>
 
-          <p>
-            Input your details to create a new account.
-          </p>
-
-          {/* Signup Form */}
           <form onSubmit={handleSubmit} noValidate>
-            {/* Full Name */}
             <div className="form-group">
-              <label htmlFor="fullName">
-                Full Name
-              </label>
-
+              <label htmlFor="fullName">Full Name</label>
               <input
                 id="fullName"
                 name="fullName"
@@ -125,12 +118,8 @@ export default function SignupPage() {
               />
             </div>
 
-            {/* Email */}
             <div className="form-group">
-              <label htmlFor="email">
-                Email Address
-              </label>
-
+              <label htmlFor="email">Email Address</label>
               <input
                 id="email"
                 name="email"
@@ -141,11 +130,8 @@ export default function SignupPage() {
               />
             </div>
 
-            {/* Password */}
             <div className="form-group">
-              <label htmlFor="password">
-                Create a New Password
-              </label>
+              <label htmlFor="password">Create a New Password</label>
 
               <div className="input-wrapper">
                 <input
@@ -168,11 +154,8 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {/* Confirm Password */}
             <div className="form-group">
-              <label htmlFor="confirmPassword">
-                Confirm New Password
-              </label>
+              <label htmlFor="confirmPassword">Confirm New Password</label>
 
               <div className="input-wrapper">
                 <input
@@ -195,7 +178,6 @@ export default function SignupPage() {
               </div>
             </div>
 
-            {/* Terms */}
             <div className="terms">
               <input
                 id="terms"
@@ -212,7 +194,6 @@ export default function SignupPage() {
 
             {error && <p className="signup-error">{error}</p>}
 
-            {/* Button */}
             <button type="submit" className="get-started" disabled={loading}>
               {loading ? "Creating account..." : "Get Started ↗"}
             </button>

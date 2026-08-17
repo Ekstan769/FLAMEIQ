@@ -1,48 +1,45 @@
-import nodemailer from 'nodemailer';
 import { config } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 
 class EmailService {
-  private transporter: nodemailer.Transporter;
-
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: config.email.host,
-      port: config.email.port,
-      // secure: true for 465, false for other ports
-      secure: config.email.port === 465, 
-      auth: {
-        user: config.email.user,
-        pass: config.email.pass,
-      },
-    });
-  }
-
   /**
    * Send an email to the specified recipient.
-   * If there's an issue with the setup, this will throw early as requested.
+   * Uses the sendlib API.
    */
   public async sendEmail(to: string, subject: string, text: string, html?: string): Promise<boolean> {
     try {
-      if (!config.email.user || !config.email.pass) {
-        logger.warn('Email config missing! Using mock sender. Add SMTP credentials to .env');
+      const apiKey = process.env.SENDLIB_API_KEY;
+      const fromEmail = process.env.SENDLIB_FROM_EMAIL;
+
+      if (!apiKey || !fromEmail) {
+        logger.warn('Email service config missing! Using mock sender. Add SENDLIB_API_KEY and SENDLIB_FROM_EMAIL to .env');
         return true;
       }
 
-      const info = await this.transporter.sendMail({
-        from: `"FLAMEIQ Backend" <${config.email.user}>`,
-        to,
-        subject,
-        text,
-        html,
+      const response = await fetch('https://sendlib.samueltuoyo.com/api/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to,
+          subject,
+          html: html || text, // Prefer HTML if available
+        })
       });
 
-      logger.info(`Message sent: ${info.messageId}`);
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Failed to send email. Status: ${response.status}, Body: ${errorBody}`);
+      }
+
+      logger.info(`Email sent successfully to ${to}`);
       return true;
     } catch (error) {
       logger.error({ err: error }, 'Error sending email');
-      // We log but don't strictly crash the app because non-blocking design is requested
-      return false; 
+      return false;
     }
   }
 }

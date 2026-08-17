@@ -1,0 +1,35 @@
+services:
+  init:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Target the builder stage to get all dependencies
+      target: builder
+    # This service only runs to create the node_modules volume
+    command: sh -c "echo 'Dependencies installed, exiting.' && exit 0"
+    volumes:
+      - node_modules:/app/node_modules
+
+  app:
+    # This depends on the init service completing successfully
+    depends_on:
+      - init
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=development
+    # Mount volumes for source code and the pre-installed node_modules
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - node_modules:/app/node_modules
+    # The command now only starts the dev server, as installation is handled by the init container.
+    command: pnpm run dev
+
+volumes:
+  node_modules:

@@ -24,8 +24,7 @@ class PredictionJob {
         });
 
         // 3. Trigger a push notification to specific clients
-        // TODO: Replace the empty array with the specific client IDs you want to notify.
-        notificationService.sendToClients([], {
+        notificationService.broadcast({
           title: 'New Automated Prediction',
           message: prediction.prediction,
           type: 'info',
