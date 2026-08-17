@@ -12,7 +12,7 @@ export default function AuthScreenHeader() {
       <Image src="/images/logo.png" alt="FlameIQ logo" width={140} height={34} />
       <button
         onClick={() => router.back()}
-        className="inline-flex items-center gap-1 text-sm font-medium text-muted-500 hover:text-ink-500"
+        className="inline-flex items-center gap-1 text-sm font-medium text-muted-500 hover:text-ink-500 cursor-pointer"
       >
         <ArrowLeft size={14} /> Go Back
       </button>
