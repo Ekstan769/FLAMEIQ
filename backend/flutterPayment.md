@@ -362,3 +362,91 @@ This confirms the charge was successful.
     }
 }
 ```
+
+---
+
+## Vendor Payout
+
+Vendor payouts are automatically processed after a customer confirms the delivery of an order. The flow is designed to be secure and transparent, ensuring vendors are paid promptly upon successful order completion.
+
+### Vendor Payout Lifecycle
+
+The payout process is tied directly to the `Order` and `Payout` models in the database and follows a clear state-driven lifecycle.
+
+#### 1. Order Creation & Payout Record
+-   **Action**: A customer places an order with a vendor.
+-   **System Behavior**:
+    -   The system calculates the total order amount, the platform's commission (e.g., 10%), and the final net amount due to the vendor.
+    -   A `Payout` database record is created and linked to the order.
+    -   The initial status of this `Payout` record is set to `PENDING`. This signifies that the order is active, but the conditions for the payout have not yet been met.
+
+#### 2. Delivery Confirmation
+-   **Action**: The customer receives their order and confirms its delivery through the app.
+-   **System Behavior**:
+    -   The `Order` status is updated to `CONFIRMED`. This is the primary trigger for the payout process.
+    -   The system asynchronously initiates the vendor payout process to avoid blocking the user-facing confirmation action.
+
+#### 3. Payout Initiation
+-   **Action**: The system begins the process of transferring funds to the vendor.
+-   **System Behavior**:
+    -   The `Payout` record's status is updated to `PROCESSING`.
+    -   A `Transaction` record with the type `PAYOUT` is created to log the outgoing payment.
+    -   The system makes an API call to the payment gateway (e.g., Flutterwave) to initiate a direct transfer to the vendor's registered bank account.
+
+**API Request to Initiate Transfer (Example):**
+```bash
+curl --request POST \
+--url 'https://developersandbox-api.flutterwave.com/direct-transfers' \
+--header 'Authorization: Bearer {{FLW_SECRET_KEY}}' \
+--header 'Content-Type: application/json' \
+--data '{
+  "action": "instant",
+  "type": "bank",
+  "callback_url": "https://yourapi.com/webhooks/payouts",
+  "narration": "Payout for Order #ORD-12345",
+  "reference": "PAYOUT-ORD-12345-TIMESTAMP",
+  "payment_instruction": {
+    "amount": { "value": 4500 }, 
+    "destination_currency": "NGN",
+    "recipient": {
+      "bank": {
+        "code": "044", 
+        "account_number": "0690000031" 
+      }
+    }
+  }
+}'
+```
+
+#### 4. Handling Payout Completion (Webhook)
+-   **Action**: The payment gateway processes the transfer and sends a webhook to notify our system of the outcome.
+-   **System Behavior**:
+    -   The system verifies the webhook's signature to ensure it's a legitimate request from the gateway.
+    -   The webhook payload contains the final status of the transfer (`SUCCESSFUL` or `FAILED`).
+
+**Sample `transfer.disburse` Webhook Payload:**
+```json
+{
+  "webhook_id": "wbk_rp0bjKyAWA52ViM8xlZ0",
+  "timestamp": 1739877172874,
+  "type": "transfer.disburse",
+  "data": {
+    "id": "trf_yMZATJ11yVPNkZ",
+    "reference": "PAYOUT-ORD-12345-TIMESTAMP",
+    "status": "SUCCESSFUL",
+    "amount": 4500,
+    "bank": {
+      "account_number": "0690000031",
+      "code": "044"
+    }
+  }
+}
+```
+
+#### 5. Final Status Update
+-   **Action**: The system processes the verified webhook.
+-   **System Behavior**:
+    -   If the transfer was `SUCCESSFUL`, the `Payout` record status is updated to `PAID`. The vendor receives a notification confirming the payout.
+    -   If the transfer `FAILED`, the `Payout` record status is updated to `FAILED`. The system logs the error, and an internal alert is triggered for the administrative team to investigate and resolve the issue manually. The vendor may also be notified to check their payout information.
+
+This automated flow ensures reliable and trackable payments to vendors, forming a critical part of the platform's trust and safety mechanism.
