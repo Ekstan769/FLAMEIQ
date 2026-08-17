@@ -1,19 +1,16 @@
 import { Request, Response } from 'express';
 import { prisma } from '@/db/prisma.js';
 import { logger } from '@/utils/logger.js';
+import { createReviewSchema } from '@/validators/reviewValidators.js';
 
 export const createReview = async (req: Request, res: Response) => {
+  const result = createReviewSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ success: false, error: result.error.flatten().fieldErrors });
+  }
+  const { orderId, rating, comment } = result.data;
   const authorId = req.user!.id;
-  const { orderId, rating, comment } = req.body;
-
-  if (!orderId || rating === undefined) {
-    return res.status(400).json({ success: false, message: 'Order ID and rating are required.' });
-  }
-
-  if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-    return res.status(400).json({ success: false, message: 'Rating must be a number between 1 and 5.' });
-  }
-
+  
   try {
     const order = await prisma.order.findUnique({
       where: { id: orderId },

@@ -1,7 +1,7 @@
 import './types/express.d.js';
 
 import express from 'express'
-import cors from 'cors'
+import { corsConfig } from './middleware/corsConfig.js';
 import dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import multer from 'multer';
@@ -13,14 +13,15 @@ import orderRoutes from './routes/orderRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import cylinderRoutes from './routes/cylinderRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
-import ipTracker from './utils/ipTracker.js'
-import httpLogger from './utils/httpLogger.js'
-import { setupSwagger } from './config/swagger.js'
+import ipTracker from './utils/ipTracker.js';
+import httpLogger from './utils/httpLogger.js';
+import { setupSwagger } from './config/swagger.js';
+import { generalLimiter, authLimiter } from './middleware/rateLimiter.js';
 
 dotenv.config()
 
 const app = express()
-app.use(cors())
+app.use(corsConfig)
 app.use(express.json())
 
 // Multer setup for in-memory file storage
@@ -29,6 +30,7 @@ const upload = multer({ storage: storage });
 
 app.use(ipTracker)
 app.use(httpLogger)
+app.use(generalLimiter);
 
 setupSwagger(app)
 
@@ -59,7 +61,7 @@ app.get('/', (req, res) => {
  *       201:
  *         description: User created successfully
  */
-app.post('/api/auth/signup', signUp)
+app.post('/api/auth/signup', authLimiter, signUp)
 
 /**
  * @swagger
@@ -82,7 +84,7 @@ app.post('/api/auth/signup', signUp)
  *       200:
  *         description: Account verified successfully, returns JWT
  */
-app.post('/api/auth/verify-otp', verifyOtp);
+app.post('/api/auth/verify-otp', authLimiter, verifyOtp);
 
 /**
  * @swagger
@@ -107,8 +109,8 @@ app.post('/api/auth/verify-otp', verifyOtp);
  *       401:
  *         description: Invalid email or password
  */
-app.post('/api/auth/signin', signIn)
-app.post('/api/auth/login', signIn)
+app.post('/api/auth/signin', authLimiter, signIn)
+app.post('/api/auth/login', authLimiter, signIn)
 
 /**
  * @swagger
@@ -129,7 +131,7 @@ app.post('/api/auth/login', signIn)
  *       200:
  *         description: A confirmation message is sent
  */
-app.post('/api/auth/forgot-password', forgotPassword);
+app.post('/api/auth/forgot-password', authLimiter, forgotPassword);
 
 /**
  * @swagger
@@ -154,7 +156,7 @@ app.post('/api/auth/forgot-password', forgotPassword);
  *       200:
  *         description: Password has been reset successfully
  */
-app.post('/api/auth/reset-password', resetPassword);
+app.post('/api/auth/reset-password', authLimiter, resetPassword);
 
 /**
  * @swagger
