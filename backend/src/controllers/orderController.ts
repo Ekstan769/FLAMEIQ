@@ -3,8 +3,7 @@ import { orderService } from '../services/orderService.js';
 import { logger } from '../utils/logger.js';
 import { AppError } from '../utils/errors.js';
 import { ProfileType } from '@prisma/client';
-import { prisma } from '../db/prisma.js';
-import { uploadToCloudinary } from '../utils/upload.js';
+import { prisma } from '@/db/prisma.js';
 
 /**
  * Handles the creation of a new order.
@@ -12,9 +11,13 @@ import { uploadToCloudinary } from '../utils/upload.js';
  */
 export const createOrder = async (req: Request, res: Response): Promise<Response> => {
   try {
+    const result = createOrderSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error.flatten().fieldErrors });
+    }
+    const { vendorId, items, type, cylinderId } = result.data;
+    
     const userId = req.user!.id;
-    const { vendorId, items, type, cylinderId } = req.body;
-
     const order = await orderService.createOrder(userId, vendorId, items, type, cylinderId);
     return res.status(201).json({ success: true, data: order });
   } catch (error) {

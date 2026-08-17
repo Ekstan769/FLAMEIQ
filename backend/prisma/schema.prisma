@@ -2,7 +2,8 @@
 // Covers authentication, profile management, reminders, and support.
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -91,19 +92,19 @@ model User {
   updatedAt DateTime   @updatedAt
 
   profile          Profile?
-  notifications    Notification[]
+  notifications    Notification[] // The relation name on the User model should be plural
   gasPredictions   GasPrediction[]
   supportTickets   SupportTicket[]
   loginHistories   LoginHistory[]
+  transactions     Transaction[]
   otpVerifications OtpVerification[]
   authoredReviews  Review[]          @relation("AuthoredReviews")
   receivedReviews  Review[]          @relation("ReceivedReviews")
-  orders           Order[]           @relation("UserOrders")
-  vendorOrders     Order[]           @relation("VendorOrders")
-  sourceTransactions      Transaction[] @relation("SourceTransactions")
+  orders           Order[]           @relation("UserOrders") // Added for Order.user relation
+  vendorOrders     Order[]           @relation("VendorOrders") // Added for Order.vendor relation
+  sourceTransactions Transaction[] @relation("SourceTransactions")
   destinationTransactions Transaction[] @relation("DestinationTransactions")
   cylinders        Cylinder[]
-  payouts          Payout[]          @relation("VendorPayouts")
 
   @@index([email])
 }
@@ -204,23 +205,25 @@ model LoginHistory {
 }
 
 model Transaction {
-  orderId     String?
-  order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  id          String   @id @default(uuid()) // Changed to UUID
-  amount      Decimal
-  commission  Decimal  @default(0.00) // Platform's commission on a PAYMENT
-  type        TxType
-  status      TxStatus
-  reference   String   @unique
-  description String?
-  gateway     String?  // e.g., "flutterwave"
-  gatewayReference String? @unique // Transaction ID from the payment gateway
-  createdAt   DateTime @default(now())
+  orderId          String?
+  order            Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  id               String   @id @default(uuid()) // Changed to UUID
+  amount           Decimal
+  commission       Decimal  @default(0.00) // Platform's commission on a PAYMENT
+  type             TxType
+  status           TxStatus
+  reference        String   @unique
+  description      String?
+  gateway          String? // e.g., "flutterwave"
+  gatewayReference String?  @unique // Transaction ID from the payment gateway
+  createdAt        DateTime @default(now())
 
   sourceUserId      String? // For PAYMENT, this is the customer.
   sourceUser        User?   @relation("SourceTransactions", fields: [sourceUserId], references: [id], onDelete: SetNull)
   destinationUserId String? // For PAYOUT, this is the vendor.
   destinationUser   User?   @relation("DestinationTransactions", fields: [destinationUserId], references: [id], onDelete: SetNull)
+  user              User?   @relation(fields: [userId], references: [id])
+  userId            String?
 }
 
 model Order {
@@ -235,13 +238,11 @@ model Order {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  cylinderId      String?
-  cylinder        Cylinder? @relation(fields: [cylinderId], references: [id], onDelete: SetNull)
-  beforeFillImage String?   // Cloudinary URL — cylinder before filling (uploaded by vendor on accept)
-  afterFillImage  String?   // Cloudinary URL — cylinder after filling (uploaded by vendor on accept)
+  cylinderId String?
+  cylinder   Cylinder? @relation(fields: [cylinderId], references: [id], onDelete: SetNull)
 
-  items        OrderItem[]
-  review       Review?
+  items       OrderItem[]
+  review      Review?
   transactions Transaction[]
   payout       Payout? // An order has one associated payout to the vendor
 
@@ -254,7 +255,7 @@ model Payout {
   orderId   String   @unique
   order     Order    @relation(fields: [orderId], references: [id])
   vendorId  String
-  vendor    User     @relation("VendorPayouts", fields: [vendorId], references: [id], onDelete: NoAction)
+  vendor    User     @relation(fields: [vendorId], references: [id], onDelete: NoAction)
   amount    Decimal // The net amount to be paid to the vendor
   status    PayoutStatus @default(PENDING)
   gatewayReference String? @unique // The reference for the transfer from the payment gateway
