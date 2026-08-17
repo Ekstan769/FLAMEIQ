@@ -1,10 +1,7 @@
-import Login from "./login";
+"use client";
 
-<<<<<<< HEAD
-export default function Page() {
-	return <Login />;
-=======
 import { FormEvent, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -78,9 +75,7 @@ export default function LoginPage() {
     <main className="login-page">
       <header className="auth-header">
         <Link href="/" className="flameiq-logo">
-          <span className="logo-flame">♨</span>
-          <span>Flame</span>
-          <strong>IQ</strong>
+          <Image src="/images/logo.png" alt="FlameIQ logo" width={140} height={34} />
         </Link>
 
         <div className="auth-header-right">
@@ -176,5 +171,4 @@ export default function LoginPage() {
       </section>
     </main>
   );
->>>>>>> 752a3730cdc96e0a8bbca82437808ae83c3c68d9
 }

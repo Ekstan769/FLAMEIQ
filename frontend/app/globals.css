@@ -1,26 +1,8 @@
 @import "tailwindcss";
 
-:root {
-  --background: #F8FAFC;
-  --foreground: #1E293B;
-
-  --primary: #1F4E79;
-  --primary-hover: #163B5C;
-
-  --secondary: #64748B;
-
-  --border: #E2E8F0;
-
-  --success: #22C55E;
-  --error: #EF4444;
-
-  --white: #FFFFFF;
-
-  --link: #2563EB;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme {
-  /* Brand blue */
   --color-brand-50: #D2DCE4;
   --color-brand-100: #B4C4D2;
   --color-brand-200: #8FA7B6;
@@ -34,7 +16,6 @@
   --color-brand-950: #061018;
   --color-brand-hover: #163B5C;
 
-  /* Link teal */
   --color-link-50: #D4F4F8;
   --color-link-100: #B7ECF3;
   --color-link-200: #93E3ED;
@@ -47,7 +28,6 @@
   --color-link-900: #0D4249;
   --color-link-950: #08282C;
 
-  /* Notification amber */
   --color-notify-50: #FDF0CC;
   --color-notify-100: #FBE6AA;
   --color-notify-200: #FADA80;
@@ -60,7 +40,6 @@
   --color-notify-900: #513C00;
   --color-notify-950: #312400;
 
-  /* Muted */
   --color-muted-50: #E0E3E8;
   --color-muted-100: #CBD1D8;
   --color-muted-200: #B2BAC5;
@@ -73,7 +52,6 @@
   --color-muted-900: #21272E;
   --color-muted-950: #14171C;
 
-  /* Ink */
   --color-ink-50: #D2D4D8;
   --color-ink-100: #B4B8BE;
   --color-ink-200: #8F949D;
@@ -86,7 +64,6 @@
   --color-ink-900: #0A0E14;
   --color-ink-950: #06080C;
 
-  /* Semantic aliases */
   --color-success: #22C55E;
   --color-error: #EF4444;
   --color-background: #F8FAFC;
@@ -94,12 +71,35 @@
   --color-border: #E2E8F0;
 }
 
+.font-heading {
+  font-family: "Sora", Arial, Helvetica, sans-serif;
+}
+
 body {
   background: var(--color-background);
   color: var(--color-ink-500);
-  font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.font-heading {
-  font-family: "Sora", Arial, Helvetica, sans-serif;
+.dark {
+  --color-background: #0B1220;
+  --color-card: #121A2B;
+  --color-border: #23304A;
+
+  --color-ink-500: #E5EAF3;
+  --color-muted-50: #1A2436;
+  --color-muted-100: #24314A;
+  --color-muted-400: #8FA0BE;
+  --color-muted-500: #A7B4CC;
+
+  --color-brand-50: #16233A;
+  --color-brand-100: #1D2F4C;
+  --color-brand-500: #4A82B8;
+  --color-brand-hover: #5C93C7;
+
+  --color-link-50: #0F2E33;
+  --color-link-500: #38D6EC;
+
+  --color-notify-50: #2E2408;
+  --color-notify-700: #F6C750;
 }
