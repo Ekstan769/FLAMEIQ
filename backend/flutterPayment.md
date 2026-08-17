@@ -1,13 +1,13 @@
-# Flutterwave Card Payment Integration Guide
+# Flutterwave Payment Integration Guide
 
-This document outlines the sequence of API calls required to process a card payment using the Flutterwave API.
+This document outlines the sequence of API calls required to process payments using the Flutterwave API. It covers both Card Payments and Bank Transfer payments via virtual accounts.
 
 **Base URL:** `https://developersandbox-api.flutterwave.com`
 
 ---
+## Card Payments
 
-## 1. Create a Customer
-
+### 1. Create a Customer
 First, create a customer record to associate with the payment.
 
 **Request:**
@@ -40,11 +40,16 @@ curl --request POST \
 
 ---
 
-## 2. Create a Card Payment Method
+### 2. Create a Card Payment Method
 
 Create a payment method using encrypted card details.
 
 > **Note:** Card details must be encrypted on the client-side using the public key provided by Flutterwave. The `encrypted_*` values are placeholders for this output.
+>
+> **How to encrypt card details:**
+> 1.  Fetch your public key from the Flutterwave dashboard or via their API.
+> 2.  Use a library (like `node-forge` for JavaScript) to perform RSA encryption on the card details (number, cvv, expiry month/year) using the public key.
+> 3.  The `nonce` is a unique, randomly generated string for each encryption request to ensure its uniqueness.
 
 **Request:**
 ```bash
@@ -86,7 +91,7 @@ curl --request POST \
 
 ---
 
-## 3. Create a Charge
+### 3. Create a Charge
 
 Initiate a charge using the `customer_id` and `payment_method_id`.
 
@@ -127,11 +132,11 @@ The response will indicate the next action required, such as `requires_pin` or `
 
 ---
 
-## 4. Complete a Charge
+### 4. Complete a Charge
 
 If the previous step required an additional action (like PIN or OTP), you must complete it.
 
-### 4a. Complete with PIN
+#### 4a. Complete with PIN
 
 **Request:**
 ```bash
@@ -168,11 +173,11 @@ curl --request PUT \
 
 ---
 
-## 5. Handle Webhook for Verification
+### 5. Handle Webhook for Verification
 
 After a charge is completed (or fails), Flutterwave sends a webhook to your configured endpoint. **You must verify the webhook's signature to ensure it is a legitimate request from Flutterwave.**
 
-### 5a. Verify the Signature
+#### 5a. Verify the Signature
 
 1.  Get the `flutterwave-signature` value from the request headers.
 2.  Get the raw request body (as a string).
@@ -217,5 +222,143 @@ Once verified, you can use the payload to update your system's records.
     "processor_response": { "type": "approved", "code": "00" },
     "created_datetime": "2025-02-13T14:24:43.133Z"
   }
+}
+
+---
+
+## Pay with Transfer (Virtual Account)
+
+This method allows customers to pay by transferring money to a dynamically generated bank account.
+
+### 1. Create a Customer
+First, ensure you have a customer record. If you haven't created one, follow **Step 1** from the [Card Payments](#card-payments) section. A `customer_id` is required to create a virtual account.
+
+---
+
+### 2. Create a Virtual Account
+Generate a temporary virtual account where the customer will send the payment.
+
+**Request:**
+```bash
+curl --request POST \
+  --url 'https://developersandbox-api.flutterwave.com/virtual-accounts' \
+  --header 'Authorization: Bearer {{FLW_SECRET_KEY}}' \
+  --header 'X-Idempotency-Key: {{UNIQUE_IDEMPOTENCY_KEY}}' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "reference": "your-unique-transaction-ref-456",
+    "customer_id": "cus_WWVaC0InrN",
+    "expiry": 60,
+    "amount": 1500,
+    "currency": "NGN",
+    "account_type": "dynamic",
+    "narration": "Payment for Order XYZ"
+  }'
+```
+-   `reference`: A unique identifier for this transaction from your system.
+-   `customer_id`: The ID of the customer making the payment.
+-   `expiry`: The time in minutes before the account expires (e.g., `60` for 1 hour).
+-   `amount`: The exact amount expected to be paid.
+-   `narration`: A short description for the payment.
+
+**Success Response (200 OK):**
+This response contains the bank details you must display to the customer.
+
+```json
+{
+    "status": "success",
+    "message": "Virtual account created",
+    "data": {
+        "id": "van_IZel8kyHKq",
+        "amount": 1500.00,
+        "account_number": "9059273981",
+        "reference": "your-unique-transaction-ref-456",
+        "account_bank_name": "Flutterwave MFB",
+        "account_type": "dynamic",
+        "status": "active",
+        "account_expiration_datetime": "2026-06-18T13:05:28.000Z",
+        "note": "Please make a bank transfer of NGN 1,500.00 to this account.",
+        "customer_id": "cus_WWVaC0InrN",
+        "created_datetime": "2026-06-18T13:04:29.863Z",
+        "currency": "NGN",
+        "narration": "Payment for Order XYZ"
+    }
+}
+```
+
+---
+
+### 3. Customer Completes Bank Transfer
+The customer uses their banking app or USSD to transfer the specified `amount` to the `account_number` and `account_bank_name` provided in the response above.
+
+---
+
+### 4. Handle Webhook for Payment Confirmation
+When Flutterwave receives the payment, it will send a `charge.completed` webhook to your configured endpoint. You **must** verify the webhook signature to ensure its authenticity, as described in **Step 5a** of the [Card Payments](#card-payments) section.
+
+**Sample `charge.completed` Webhook for Bank Transfer:**
+```json
+{
+  "webhook_id": "wbk_xCBGoxP44NzL74hcCJiV",
+  "timestamp": 1748850422635,
+  "type": "charge.completed",
+  "data": {
+    "id": "chg_zH0BLoNltt",
+    "amount": 1500,
+    "currency": "NGN",
+    "reference": "your-unique-transaction-ref-456",
+    "status": "succeeded",
+    "customer": {
+      "id": "cus_WWVaC0InrN",
+      "email": "customer@example.com"
+    },
+    "payment_method": {
+      "type": "bank_transfer"
+    },
+    "processor_response": {
+      "type": "approved",
+      "code": "00"
+    },
+    "created_datetime": "2025-06-02T07:47:02.537Z"
+  }
+}
+```
+Upon receiving and verifying this webhook, you can safely credit the customer's account or fulfill their order.
+
+---
+
+### 5. (Optional) Verify Charge Status Manually
+If needed, you can also verify the status of a charge by its `id` (from the webhook) or your `reference`.
+
+**Request:**
+```bash
+curl --request GET \
+  --url 'https://developersandbox-api.flutterwave.com/charges/chg_zH0BLoNltt' \
+  --header 'Authorization: Bearer {{FLW_SECRET_KEY}}'
+```
+*You can also query by reference: `GET /charges?reference=your-unique-transaction-ref-456`*
+
+**Success Response (200 OK):**
+This confirms the charge was successful.
+```json
+{
+    "status": "success",
+    "message": "Charge fetched",
+    "data": {
+        "id": "chg_zH0BLoNltt",
+        "amount": 1500,
+        "currency": "NGN",
+        "customer_id": "cus_WWVaC0InrN",
+        "reference": "your-unique-transaction-ref-456",
+        "status": "succeeded",
+        "payment_method_details": {
+            "type": "bank_transfer"
+        },
+        "processor_response": {
+            "type": "approved",
+            "code": "00"
+        },
+        "created_datetime": "2025-06-02T07:47:02.945Z"
+    }
 }
 ```
