@@ -15,6 +15,11 @@ export const config = {
   flutterwaveSecretKey: process.env.FLUTTER_KEY,
   flutterwaveSecretHash: process.env.FLUTTERWAVE_SECRET_HASH,
   flutterwavePublicKey: process.env.FLUTTERWAVE_PUBLIC_KEY,
+  // Required only when using Flutterwave's server-side SDK encryption flow.
+  // Never expose this value through an API or NEXT_PUBLIC_ variable.
+  flutterwaveEncryptionKey: process.env.FLUTTERWAVE_ENCRYPTION_KEY,
+  flutterwaveClientId: process.env.FLUTTERWAVE_CLIENT_ID,
+  flutterwaveClientSecret: process.env.FLUTTERWAVE_CLIENT_SECRET,
   flutterwaveBaseUrl: process.env.FLUTTERWAVE_BASE_URL || 'https://developersandbox-api.flutterwave.com',
 
   // Commission rate

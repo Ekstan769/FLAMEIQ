@@ -12,6 +12,7 @@ router.use(authenticate);
 
 router.get('/public-key', paymentController.getPublicKey);
 router.post('/card', paymentController.payWithCard);
+router.post('/card/token', paymentController.payWithCardToken);
 router.post('/bank-transfer', paymentController.payWithBankTransfer);
 router.post('/initiate', paymentController.initiatePayment);
 router.get('/verify/:reference', paymentController.verifyPayment);

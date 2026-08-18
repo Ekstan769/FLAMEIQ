@@ -36,6 +36,7 @@ enum PayoutStatus {
 
 enum OrderStatus {
   PAYMENT_PENDING // Order placed but awaiting payment confirmation
+  PAID // Payment confirmed; awaiting vendor action
   PENDING // Payment confirmed; awaiting vendor action
   ACCEPTED // Vendor accepted (with before/after images)
   ON_ROUTE // Vendor dispatched the order
@@ -52,6 +53,7 @@ enum OrderType {
 
 enum Role {
   USER
+  VENDOR
   ADMIN
 }
 

@@ -49,7 +49,9 @@ async function flutterwaveApiCall(
       logger.error({
         message: `Flutterwave API error at ${endpoint}`,
         statusCode: response.status,
-        responseData,
+        // Payment-method responses can contain card-related metadata. Do not
+        // place gateway payloads in logs where they could be retained.
+        responseData: endpoint === '/payment-methods' ? '[redacted]' : responseData,
       });
       throw new AppError(
         responseData.message || `Flutterwave API request failed: ${response.statusText}`,
@@ -150,6 +152,41 @@ async function initiateCardPayment(
   });
 
   logger.info(`Card charge initiated for order reference: ${transaction.reference}`);
+  return chargeData.data;
+}
+
+/**
+ * Charges a Flutterwave-issued payment-method token. This is deliberately a
+ * one-way flow: FlameIQ never receives or decrypts cardholder data.
+ */
+async function initiateTokenizedCardPayment(
+  order: Order,
+  transaction: Transaction,
+  paymentMethodId: string,
+  redirectUrl: string,
+) {
+  const user = await prisma.user.findUnique({ where: { id: order.userId } });
+  if (!user) {
+    throw new AppError('User associated with the order not found.', 404);
+  }
+
+  const customerData = await flutterwaveApiCall('/customers', 'POST', {
+    email: user.email,
+    name: user.name,
+  });
+  const customer_id = customerData.data.id;
+
+  const chargeData = await flutterwaveApiCall('/charges', 'POST', {
+    amount: order.totalAmount,
+    currency: 'NGN',
+    reference: transaction.reference,
+    customer_id,
+    payment_method_id: paymentMethodId,
+    redirect_url: redirectUrl,
+    meta: { order_id: order.id },
+  }, transaction.reference);
+
+  logger.info(`Tokenized card charge initiated for order reference: ${transaction.reference}`);
   return chargeData.data;
 }
 
@@ -410,6 +447,7 @@ async function initiateVendorPayout(payout: Payout, bankDetails: { code: string;
 export const paymentService = {
   createVirtualAccountForOrder,
   initiateCardPayment,
+  initiateTokenizedCardPayment,
   initiateWalletFunding,
   verifyWebhookSignature,
   processSuccessfulCharge,

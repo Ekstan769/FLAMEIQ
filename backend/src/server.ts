@@ -15,6 +15,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import payoutRoutes from './routes/payoutRoutes.js';
 import cylinderRoutes from './routes/cylinderRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
+import routesRouter from './routes/routes.js';
 import ipTracker from './utils/ipTracker.js';
 import httpLogger from './utils/httpLogger.js';
 import { setupSwagger } from './config/swagger.js';
@@ -605,6 +606,7 @@ app.use('/api/cylinders', cylinderRoutes);
  *         description: Invalid input, not authorized, or review already exists.
  */
 app.use('/api/reviews', reviewRoutes);
+app.use('/routes', routesRouter);
 
 // --- Payout Routes ---
 /**

@@ -3,7 +3,7 @@ import { logger } from '../utils/logger.js';
 import { paymentService } from '../services/paymentService.js';
 import { AppError } from '@/utils/errors.js';
 import { prisma } from '@/db/prisma.js';
-import { payWithBankTransferSchema, payWithCardSchema } from '@/validators/paymentValidators.js';
+import { payWithBankTransferSchema, payWithCardSchema, payWithCardTokenSchema } from '@/validators/paymentValidators.js';
 
 async function getPendingOrderPayment(orderId: string, userId: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId } });
@@ -118,6 +118,9 @@ export const paymentController = {
       if (!order) {
         return res.status(404).json({ status: 'error', message: 'Order not found.' });
       }
+      if (order.userId !== req.user!.id) {
+        return res.status(403).json({ status: 'error', message: 'You are not allowed to pay for this order.' });
+      }
 
       const transaction = await prisma.transaction.findFirst({
         where: { orderId, status: 'PENDING', type: 'PAYMENT' },
@@ -151,6 +154,44 @@ export const paymentController = {
         status: 'error',
         message: 'An internal server error occurred during card payment initiation.',
       });
+    }
+  },
+
+  /**
+   * Charges a Flutterwave tokenized payment method. Card details never pass
+   * through this endpoint and must never be decrypted by the application.
+   */
+  async payWithCardToken(req: Request, res: Response) {
+    const result = payWithCardTokenSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid request body.',
+        errors: result.error.flatten().fieldErrors,
+      });
+    }
+
+    const { orderId, paymentMethodId, redirectUrl } = result.data;
+    try {
+      const { order, transaction } = await getPendingOrderPayment(orderId, req.user!.id);
+      const paymentData = await paymentService.initiateTokenizedCardPayment(
+        order,
+        transaction,
+        paymentMethodId,
+        redirectUrl,
+      );
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'Tokenized card payment initiated successfully.',
+        data: paymentData,
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ status: 'error', message: error.message });
+      }
+      logger.error({ err: error }, 'Error initiating tokenized card payment');
+      return res.status(500).json({ status: 'error', message: 'Unable to initiate tokenized card payment.' });
     }
   },
 
