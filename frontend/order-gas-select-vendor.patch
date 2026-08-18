@@ -1,0 +1,414 @@
+diff --git a/frontend/app/customer/orders/page.tsx b/frontend/app/customer/orders/page.tsx
+index e0a0612..81ad3c7 100644
+--- a/frontend/app/customer/orders/page.tsx
++++ b/frontend/app/customer/orders/page.tsx
+@@ -1,7 +1,225 @@
+-﻿export default function OrdersPage() {
++"use client";
++
++import { useEffect, useMemo, useState } from "react";
++import Link from "next/link";
++import { useRouter } from "next/navigation";
++import { Search, ChevronDown, ChevronRight } from "lucide-react";
++import VendorCard from "@/components/cards/VendorCard";
++import { getVendors } from "@/services/vendorService";
++import type { Vendor } from "@/types/vendor";
++
++type SortOption = "nearest" | "top-rated" | "price-low" | "price-high";
++
++const SORT_LABELS: Record<SortOption, string> = {
++  nearest: "Nearest",
++  "top-rated": "Top Rated",
++  "price-low": "Price: Low to High",
++  "price-high": "Price: High to Low",
++};
++
++const PAGE_SIZE = 6;
++
++export default function OrdersPage() {
++  const router = useRouter();
++
++  const [vendors, setVendors] = useState<Vendor[]>([]);
++  const [page, setPage] = useState(1);
++  const [hasMore, setHasMore] = useState(false);
++  const [loading, setLoading] = useState(true);
++  const [loadingMore, setLoadingMore] = useState(false);
++  const [error, setError] = useState("");
++
++  const [search, setSearch] = useState("");
++  const [sortBy, setSortBy] = useState<SortOption>("nearest");
++  const [isSortOpen, setIsSortOpen] = useState(false);
++  const [selectedVendorId, setSelectedVendorId] = useState<string | null>(
++    null
++  );
++
++  const fetchVendors = async (pageToLoad: number, append: boolean) => {
++    append ? setLoadingMore(true) : setLoading(true);
++    setError("");
++    try {
++      const response = await getVendors({ page: pageToLoad, limit: PAGE_SIZE });
++      const { vendors: fetched, hasMore: more } = response.data;
++      setVendors((prev) => (append ? [...prev, ...fetched] : fetched));
++      setHasMore(more);
++      setPage(pageToLoad);
++    } catch {
++      setError("Unable to load vendors. Please try again.");
++    } finally {
++      append ? setLoadingMore(false) : setLoading(false);
++    }
++  };
++
++  useEffect(() => {
++    fetchVendors(1, false);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, []);
++
++  const visibleVendors = useMemo(() => {
++    const filtered = vendors.filter((vendor) =>
++      vendor.name.toLowerCase().includes(search.trim().toLowerCase())
++    );
++
++    const sorted = [...filtered];
++    switch (sortBy) {
++      case "top-rated":
++        sorted.sort((a, b) => b.rating - a.rating);
++        break;
++      case "price-low":
++        sorted.sort((a, b) => a.pricePerUnit - b.pricePerUnit);
++        break;
++      case "price-high":
++        sorted.sort((a, b) => b.pricePerUnit - a.pricePerUnit);
++        break;
++      case "nearest":
++      default:
++        sorted.sort((a, b) => a.distanceKm - b.distanceKm);
++        break;
++    }
++    return sorted;
++  }, [vendors, search, sortBy]);
++
++  const handleContinue = () => {
++    if (!selectedVendorId) return;
++    router.push(`/customer/orders/quantity?vendorId=${selectedVendorId}`);
++  };
++
+   return (
+-    <main>
+-      <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
+-    </main>
++    <div>
++      {/* Page-scoped breadcrumb + title (kept separate from the shared Navbar) */}
++      <div className="mb-6">
++        <nav className="flex items-center gap-1.5 text-xs text-muted-500">
++          <Link href="/customer/dashboard" className="hover:text-ink-500">
++            Dashboard
++          </Link>
++          <ChevronRight size={12} />
++          <span className="text-ink-500">Order Gas</span>
++        </nav>
++        <h1 className="mt-1 text-2xl font-bold text-ink-500">Order Gas</h1>
++      </div>
++
++      {/* Select Vendor card */}
++      <div className="rounded-2xl border border-border bg-card p-6">
++        <h2 className="text-lg font-bold text-ink-500">Select Vendor</h2>
++        <p className="mt-1 text-sm text-muted-500">
++          Select a trusted vendor near you.
++        </p>
++
++        {/* Search + Sort */}
++        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
++          <div className="relative flex-1">
++            <Search
++              size={16}
++              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-400"
++            />
++            <input
++              type="text"
++              value={search}
++              onChange={(e) => setSearch(e.target.value)}
++              placeholder="Search Vendors"
++              className="w-full rounded-lg border border-border bg-white py-2.5 pl-9 pr-3 text-sm text-ink-500 outline-none focus:border-brand-500"
++            />
++          </div>
++
++          <div className="relative">
++            <button
++              type="button"
++              onClick={() => setIsSortOpen((open) => !open)}
++              className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-white px-4 py-2.5 text-sm text-ink-500 sm:w-40"
++            >
++              Sort by
++              <ChevronDown size={14} className="text-muted-500" />
++            </button>
++
++            {isSortOpen && (
++              <div className="absolute right-0 z-10 mt-1 w-44 rounded-lg border border-border bg-white p-1 shadow-lg">
++                {(Object.keys(SORT_LABELS) as SortOption[]).map((option) => (
++                  <button
++                    key={option}
++                    type="button"
++                    onClick={() => {
++                      setSortBy(option);
++                      setIsSortOpen(false);
++                    }}
++                    className={`block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-brand-50 ${
++                      sortBy === option
++                        ? "font-semibold text-brand-500"
++                        : "text-ink-500"
++                    }`}
++                  >
++                    {SORT_LABELS[option]}
++                  </button>
++                ))}
++              </div>
++            )}
++          </div>
++        </div>
++
++        {/* Vendor list */}
++        <h3 className="mt-6 text-base font-bold text-ink-500">
++          Available Vendors
++        </h3>
++
++        <div className="mt-3 flex flex-col gap-3">
++          {loading && (
++            <p className="py-6 text-center text-sm text-muted-500">
++              Loading vendors…
++            </p>
++          )}
++
++          {!loading && error && (
++            <div className="py-6 text-center">
++              <p className="text-sm text-error">{error}</p>
++              <button
++                type="button"
++                onClick={() => fetchVendors(1, false)}
++                className="mt-2 text-sm font-medium text-brand-500 hover:underline"
++              >
++                Try again
++              </button>
++            </div>
++          )}
++
++          {!loading && !error && visibleVendors.length === 0 && (
++            <p className="py-6 text-center text-sm text-muted-500">
++              No vendors match your search.
++            </p>
++          )}
++
++          {!loading &&
++            !error &&
++            visibleVendors.map((vendor) => (
++              <VendorCard
++                key={vendor.id}
++                vendor={vendor}
++                selected={selectedVendorId === vendor.id}
++                onSelect={() => setSelectedVendorId(vendor.id)}
++              />
++            ))}
++        </div>
++
++        {!loading && !error && hasMore && !search && (
++          <button
++            type="button"
++            onClick={() => fetchVendors(page + 1, true)}
++            disabled={loadingMore}
++            className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-3 text-sm font-medium text-brand-500 hover:bg-brand-50 disabled:opacity-60"
++          >
++            {loadingMore ? "Loading…" : "View more vendors →"}
++          </button>
++        )}
++
++        <button
++          type="button"
++          onClick={handleContinue}
++          disabled={!selectedVendorId}
++          className="mt-4 w-full rounded-lg bg-brand-500 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
++        >
++          Continue
++        </button>
++      </div>
++    </div>
+   );
+ }
+diff --git a/frontend/app/customer/orders/quantity/page.tsx b/frontend/app/customer/orders/quantity/page.tsx
+new file mode 100644
+index 0000000..52bc54b
+--- /dev/null
++++ b/frontend/app/customer/orders/quantity/page.tsx
+@@ -0,0 +1,12 @@
++export default function OrderQuantityPage() {
++  return (
++    <main>
++      <h1 className="text-xl font-semibold text-ink-500">
++        Select Quantity
++      </h1>
++      <p className="mt-2 text-sm text-muted-500">
++        Next step of the Order Gas flow — coming soon.
++      </p>
++    </main>
++  );
++}
+diff --git a/frontend/components/cards/VendorCard.tsx b/frontend/components/cards/VendorCard.tsx
+index e69de29..8429d34 100644
+--- a/frontend/components/cards/VendorCard.tsx
++++ b/frontend/components/cards/VendorCard.tsx
+@@ -0,0 +1,114 @@
++import { Star } from "lucide-react";
++import type { Vendor, VendorBadge } from "@/types/vendor";
++
++const BADGE_STYLES: Record<VendorBadge, string> = {
++  "Top Rated": "bg-success/10 text-success",
++  Verified: "bg-success/10 text-success",
++  "High risk": "bg-error/10 text-error",
++};
++
++function GasCylinderIcon() {
++  return (
++    <svg viewBox="0 0 24 24" width={22} height={22} fill="none">
++      <rect x="4" y="2.5" width="3" height="2" rx="0.5" fill="#F4B400" />
++      <rect
++        x="3"
++        y="4.5"
++        width="18"
++        height="17"
++        rx="4"
++        fill="#1F4E79"
++      />
++      <rect x="6" y="8" width="12" height="10" rx="2" fill="#ffffff" opacity="0.12" />
++    </svg>
++  );
++}
++
++export default function VendorCard({
++  vendor,
++  selected,
++  onSelect,
++}: {
++  vendor: Vendor;
++  selected: boolean;
++  onSelect: () => void;
++}) {
++  const isLowRated = vendor.rating < 3;
++
++  return (
++    <button
++      type="button"
++      onClick={onSelect}
++      disabled={!vendor.available}
++      className={`flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
++        selected
++          ? "border-brand-500 bg-brand-50/60"
++          : "border-border bg-white hover:border-brand-200"
++      }`}
++    >
++      {/* Icon */}
++      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted-50">
++        <GasCylinderIcon />
++      </span>
++
++      {/* Name, badge, rating, distance */}
++      <span className="min-w-0 flex-1">
++        <span className="flex flex-wrap items-center gap-2">
++          <span className="text-sm font-semibold text-ink-500">
++            {vendor.name}
++          </span>
++          {vendor.badge && (
++            <span
++              className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${BADGE_STYLES[vendor.badge]}`}
++            >
++              {vendor.badge}
++            </span>
++          )}
++        </span>
++
++        <span className="mt-1 flex items-center gap-2">
++          <span
++            className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${
++              isLowRated
++                ? "bg-error/10 text-error"
++                : "bg-notify-50 text-notify-700"
++            }`}
++          >
++            <Star size={10} fill="currentColor" strokeWidth={0} />
++            {vendor.rating.toFixed(1)} ({vendor.reviewCount})
++          </span>
++        </span>
++
++        <span className="mt-1 block text-xs text-muted-500">
++          {vendor.distanceKm}km away • {vendor.etaMinutes} mins
++        </span>
++      </span>
++
++      {/* Price, weight, availability */}
++      <span className="shrink-0 text-right">
++        <span className="block text-sm font-semibold text-ink-500">
++          ₦{vendor.pricePerUnit.toLocaleString()}
++        </span>
++        <span className="block text-xs text-muted-500">
++          {vendor.weightKg}kg
++        </span>
++        <span
++          className={`mt-1 block text-[11px] font-medium ${
++            vendor.available ? "text-success" : "text-error"
++          }`}
++        >
++          • {vendor.available ? "Available" : "Unavailable"}
++        </span>
++      </span>
++
++      {/* Radio indicator */}
++      <span
++        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
++          selected ? "border-brand-500" : "border-muted-200"
++        }`}
++      >
++        {selected && <span className="h-2 w-2 rounded-full bg-brand-500" />}
++      </span>
++    </button>
++  );
++}
+diff --git a/frontend/services/vendorService.ts b/frontend/services/vendorService.ts
+index ef8f272..f46d47c 100644
+--- a/frontend/services/vendorService.ts
++++ b/frontend/services/vendorService.ts
+@@ -1,5 +1,13 @@
+-﻿import apiClient from "./apiClient";
++import apiClient from "./apiClient";
++import type { VendorListResponse } from "@/types/vendor";
+ 
+ export const getInventory = () => apiClient.get("/vendor/inventory");
+ export const getAnalytics = () => apiClient.get("/vendor/analytics");
+ export const getEarnings = () => apiClient.get("/vendor/earnings");
++
++// Customer-facing: list vendors available for a gas order (Order Gas →
++// Select Vendor). Backend route is not implemented yet as of this
++// commit — following the same ahead-of-backend contract pattern already
++// used by authService.ts for /auth/*.
++export const getVendors = (params?: { page?: number; limit?: number }) =>
++  apiClient.get<VendorListResponse>("/vendors", { params });
+diff --git a/frontend/types/vendor.ts b/frontend/types/vendor.ts
+index e69de29..377d4e1 100644
+--- a/frontend/types/vendor.ts
++++ b/frontend/types/vendor.ts
+@@ -0,0 +1,19 @@
++export type VendorBadge = "Top Rated" | "Verified" | "High risk";
++
++export interface Vendor {
++  id: string;
++  name: string;
++  badge?: VendorBadge;
++  rating: number;
++  reviewCount: number;
++  distanceKm: number;
++  etaMinutes: number;
++  pricePerUnit: number;
++  weightKg: number;
++  available: boolean;
++}
++
++export interface VendorListResponse {
++  vendors: Vendor[];
++  hasMore: boolean;
++}
