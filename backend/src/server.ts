@@ -15,6 +15,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import payoutRoutes from './routes/payoutRoutes.js';
 import cylinderRoutes from './routes/cylinderRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
+//import predictionRoutes from './routes/predictionRoutes.js';
 import routesRouter from './routes/routes.js';
 import ipTracker from './utils/ipTracker.js';
 import httpLogger from './utils/httpLogger.js';
@@ -607,6 +608,42 @@ app.use('/api/cylinders', cylinderRoutes);
  */
 app.use('/api/reviews', reviewRoutes);
 app.use('/routes', routesRouter);
+
+// --- Prediction Routes ---
+/**
+ * @swagger
+ * tags:
+ *   name: Predictions
+ *   description: API for managing gas refill predictions
+ */
+
+/**
+ * @swagger
+ * /api/predictions/initial:
+ *   post:
+ *     summary: Generate the first (cold-start) prediction for a user
+ *     tags: [Predictions]
+ *     description: >
+ *       This endpoint is typically called automatically after a user registers their first cylinder
+ *       and has provided their household profile information. It generates a "cold-start" prediction
+ *       and saves it.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               cylinderId:
+ *                 type: string
+ *                 description: The ID of the user's first registered cylinder.
+ *     responses:
+ *       202:
+ *         description: Prediction generation has been accepted and is processing in the background.
+ */
+//app.use('/api/predictions', predictionRoutes);
 
 // --- Payout Routes ---
 /**
