@@ -20,11 +20,11 @@ export default function PromoBanner() {
         </Link>
       </div>
 
-      <div className="absolute -right-4 bottom-0 h-32 w-32 opacity-90">
+      <div className="absolute -right-2 bottom-1 h-44 w-34 opacity-90">
         <Image
-          src="/images/loading-cylinder.png"
+          src="/images/load-cylinder.png"
           alt="FlameIQ gas cylinder"
-          fill
+          fill          
           className="object-contain"
         />
       </div>
