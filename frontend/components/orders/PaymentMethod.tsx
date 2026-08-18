@@ -22,7 +22,7 @@ export default function PaymentMethod() {
   };
 
   return (
-    <div className="max-w-xl">
+    <div className="max-w-xl mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
       <div className="rounded-2xl border border-border bg-card p-6">
         <h2 className="font-heading text-lg font-bold text-ink-500">
           Payment Method
