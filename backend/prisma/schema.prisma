@@ -167,7 +167,8 @@ model GasPrediction {
   cylinderId         String?
   cylinder           Cylinder? @relation(fields: [cylinderId], references: [id], onDelete: SetNull)
   estimatedEmptyDate DateTime
-  confidence         Float||String?
+  confidence         Float?
+  predictionInput    Json?     @map("prediction_input")
   createdAt          DateTime  @default(now())
 
   @@index([userId])

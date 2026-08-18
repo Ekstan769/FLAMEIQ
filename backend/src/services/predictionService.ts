@@ -63,10 +63,11 @@ class PredictionService {
         data: {
           userId: user.id,
           cylinderId: cylinder.id,
-          estimatedCycleDays: predictionResult.estimated_cycle_days,
-          estimatedRefillDate: new Date(predictionResult.estimated_refill_date),
-          confidence: predictionResult.confidence,
+          // The AI service returns snake_case `estimated_refill_date`
+          estimatedEmptyDate: new Date(predictionResult.estimated_refill_date),
+          confidence: 0.5, // Placeholder for "Early Estimate"
           // Store the input for future reference/auditing
+          // NOTE: This field must be added to the GasPrediction model in schema.prisma
           predictionInput: JSON.stringify(predictionInput),
         },
       });
