@@ -19,7 +19,7 @@ export default function OrdersPage() {
       </h1>
 
       <Link
-        href="/customer/dashboard/order-summary"
+        href="/customer/orders/summary"
         className="mt-5 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink-500 hover:bg-brand-50"
       >
         <ArrowLeft size={14} /> Back

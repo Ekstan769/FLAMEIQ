@@ -1,0 +1,739 @@
+diff --git a/frontend/app/customer/orders/layout.tsx b/frontend/app/customer/orders/layout.tsx
+new file mode 100644
+index 0000000..4ae7616
+--- /dev/null
++++ b/frontend/app/customer/orders/layout.tsx
+@@ -0,0 +1,10 @@
++import type { ReactNode } from "react";
++import { OrderProvider } from "@/context/OrderContext";
++
++// Scoped to the Order Gas flow only (quantity → vendor-selection →
++// delivery-address → summary → payment-selection → payment), so every
++// stage shares one in-progress order without touching the wider
++// customer layout or any other page.
++export default function OrdersLayout({ children }: { children: ReactNode }) {
++  return <OrderProvider>{children}</OrderProvider>;
++}
+diff --git a/frontend/app/customer/orders/page.tsx b/frontend/app/customer/orders/page.tsx
+index 4677fc8..19be405 100644
+--- a/frontend/app/customer/orders/page.tsx
++++ b/frontend/app/customer/orders/page.tsx
+@@ -1,33 +1,7 @@
++import { redirect } from "next/navigation";
+ 
+-import Link from "next/link";
+-import { ArrowLeft, ChevronRight } from "lucide-react";
+-import PaymentMethod from "@/components/orders/PaymentMethod";
+-
+-export default function OrdersPage() {
+-  return (
+-    <main>
+-      <div className="flex items-center gap-1.5 text-xs text-muted-500">
+-        <Link href="/customer/dashboard" className="hover:text-ink-500">
+-          Dashboard
+-        </Link>
+-        <ChevronRight size={12} />
+-        <span className="text-ink-500">Order Gas</span>
+-      </div>
+-
+-      <h1 className="font-heading mt-1 text-xl font-bold text-ink-500">
+-        Order Gas
+-      </h1>
+-
+-      <Link
+-        href="/customer/dashboard/order-summary"
+-        className="mt-5 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink-500 hover:bg-brand-50"
+-      >
+-        <ArrowLeft size={14} /> Back
+-      </Link>
+-
+-      <div className="mt-6">
+-        <PaymentMethod />
+-      </div>
+-    </main>
+-  );
+-}
+\ No newline at end of file
++// Entry point for the "Order Gas" sidebar/nav link — always starts the
++// flow at cylinder selection.
++export default function OrdersEntryPage() {
++  redirect("/customer/orders/quantity");
++}
+diff --git a/frontend/app/customer/orders/payment-selection/page.tsx b/frontend/app/customer/orders/payment-selection/page.tsx
+index 4677fc8..0a555ca 100644
+--- a/frontend/app/customer/orders/payment-selection/page.tsx
++++ b/frontend/app/customer/orders/payment-selection/page.tsx
+@@ -19,7 +19,7 @@ export default function OrdersPage() {
+       </h1>
+ 
+       <Link
+-        href="/customer/dashboard/order-summary"
++        href="/customer/orders/summary"
+         className="mt-5 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink-500 hover:bg-brand-50"
+       >
+         <ArrowLeft size={14} /> Back
+diff --git a/frontend/app/customer/orders/payment/page.tsx b/frontend/app/customer/orders/payment/page.tsx
+new file mode 100644
+index 0000000..b7469d8
+--- /dev/null
++++ b/frontend/app/customer/orders/payment/page.tsx
+@@ -0,0 +1,207 @@
++"use client";
++
++import { useMemo, useState, type FormEvent } from "react";
++import Link from "next/link";
++import { useRouter } from "next/navigation";
++import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, Lock } from "lucide-react";
++import { useOrder } from "@/context/OrderContext";
++import SuccessModal from "@/components/modals/SuccessModal";
++
++export default function PaymentPage() {
++  const router = useRouter();
++  const { order } = useOrder();
++
++  const [showDetails, setShowDetails] = useState(false);
++  const [cardNumber, setCardNumber] = useState("");
++  const [expiry, setExpiry] = useState("");
++  const [cvv, setCvv] = useState("");
++  const [cardholderName, setCardholderName] = useState("");
++  const [submitting, setSubmitting] = useState(false);
++  const [success, setSuccess] = useState(false);
++
++  const price = order.pricePerUnit ?? 0;
++  const totalAmount = useMemo(
++    () => price * order.quantity + order.deliveryFee,
++    [price, order.quantity, order.deliveryFee]
++  );
++
++  const handleSubmit = (e: FormEvent) => {
++    e.preventDefault();
++    // TODO: wire to a real payment/checkout service once the backend
++    // endpoint (POST /api/orders) is confirmed ready. UI-only for now,
++    // matching the same ahead-of-backend pattern used elsewhere.
++    setSubmitting(true);
++    setTimeout(() => {
++      setSubmitting(false);
++      setSuccess(true);
++    }, 800);
++  };
++
++  return (
++    <div>
++      <div className="mb-6">
++        <nav className="flex items-center gap-1.5 text-xs text-muted-500">
++          <Link href="/customer/dashboard" className="hover:text-ink-500">
++            Dashboard
++          </Link>
++          <ChevronRight size={12} />
++          <span className="text-ink-500">Order Gas</span>
++        </nav>
++        <h1 className="mt-1 text-2xl font-bold text-ink-500">Order Gas</h1>
++      </div>
++
++      <div className="rounded-2xl border border-border bg-card p-6">
++        <button
++          type="button"
++          onClick={() => router.back()}
++          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink-500 hover:bg-brand-50"
++        >
++          <ArrowLeft size={14} /> Back
++        </button>
++
++        <h2 className="mt-5 text-2xl font-bold text-ink-500">
++          Pay with card
++        </h2>
++
++        <div className="mt-5 max-w-md">
++          <div className="rounded-xl bg-muted-50/60 p-4">
++            <div className="flex items-center justify-between">
++              <div>
++                <p className="text-xs text-muted-500">Amount Pay</p>
++                <p className="mt-1 text-2xl font-bold text-ink-500">
++                  ₦{totalAmount.toLocaleString()}
++                </p>
++              </div>
++              <button
++                type="button"
++                onClick={() => setShowDetails((open) => !open)}
++                className="flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 text-sm text-ink-500"
++              >
++                Details
++                <ChevronDown
++                  size={14}
++                  className={`transition-transform ${showDetails ? "rotate-180" : ""}`}
++                />
++              </button>
++            </div>
++
++            {showDetails && (
++              <div className="mt-4 space-y-2 border-t border-border pt-3 text-sm">
++                <div className="flex items-center justify-between">
++                  <span className="text-muted-500">Cylinder Price</span>
++                  <span className="text-ink-500">
++                    ₦{price.toLocaleString()}
++                  </span>
++                </div>
++                <div className="flex items-center justify-between">
++                  <span className="text-muted-500">Delivery Fee</span>
++                  <span className="text-ink-500">
++                    ₦{order.deliveryFee.toLocaleString()}
++                  </span>
++                </div>
++              </div>
++            )}
++          </div>
++
++          <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4">
++            <div>
++              <label
++                htmlFor="cardNumber"
++                className="block text-sm font-medium text-ink-500"
++              >
++                Card Number
++              </label>
++              <input
++                id="cardNumber"
++                type="text"
++                inputMode="numeric"
++                placeholder="5993 1234 8297 3679"
++                value={cardNumber}
++                onChange={(e) => setCardNumber(e.target.value)}
++                required
++                className="mt-1.5 w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink-500 outline-none placeholder:text-muted-400 focus:border-brand-500"
++              />
++            </div>
++
++            <div className="flex gap-4">
++              <div className="flex-1">
++                <label
++                  htmlFor="expiry"
++                  className="block text-sm font-medium text-ink-500"
++                >
++                  Expiry Date
++                </label>
++                <input
++                  id="expiry"
++                  type="text"
++                  placeholder="mm/yy"
++                  value={expiry}
++                  onChange={(e) => setExpiry(e.target.value)}
++                  required
++                  className="mt-1.5 w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink-500 outline-none placeholder:text-muted-400 focus:border-brand-500"
++                />
++              </div>
++              <div className="flex-1">
++                <label
++                  htmlFor="cvv"
++                  className="block text-sm font-medium text-ink-500"
++                >
++                  CVV
++                </label>
++                <input
++                  id="cvv"
++                  type="text"
++                  inputMode="numeric"
++                  placeholder="123"
++                  value={cvv}
++                  onChange={(e) => setCvv(e.target.value)}
++                  required
++                  className="mt-1.5 w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink-500 outline-none placeholder:text-muted-400 focus:border-brand-500"
++                />
++              </div>
++            </div>
++
++            <div>
++              <label
++                htmlFor="cardholderName"
++                className="block text-sm font-medium text-ink-500"
++              >
++                Cardholder Name
++              </label>
++              <input
++                id="cardholderName"
++                type="text"
++                placeholder="Victor Oboyibo"
++                value={cardholderName}
++                onChange={(e) => setCardholderName(e.target.value)}
++                required
++                className="mt-1.5 w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm text-ink-500 outline-none placeholder:text-muted-400 focus:border-brand-500"
++              />
++            </div>
++
++            <button
++              type="submit"
++              disabled={submitting}
++              className="mt-1 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
++            >
++              {submitting ? "Processing…" : "Proceed to Payment"}
++              {!submitting && <ArrowRight size={16} />}
++            </button>
++
++            <p className="flex items-center justify-center gap-1.5 text-xs text-muted-500">
++              <Lock size={12} />
++              All payments are secured and encrypted
++            </p>
++          </form>
++        </div>
++      </div>
++
++      <SuccessModal
++        isOpen={success}
++        title="Order Placed Successful 🎉"
++        message="Your gas cylinder is on its way. You can track your delivery in real time."
++        redirectTo="/customer/track-delivery"
++      />
++    </div>
++  );
++}
+diff --git a/frontend/app/customer/orders/quantity/page.tsx b/frontend/app/customer/orders/quantity/page.tsx
+index 52bc54b..efad300 100644
+--- a/frontend/app/customer/orders/quantity/page.tsx
++++ b/frontend/app/customer/orders/quantity/page.tsx
+@@ -1,12 +1,92 @@
++"use client";
++
++import { useState } from "react";
++import Link from "next/link";
++import Image from "next/image";
++import { useRouter } from "next/navigation";
++import { ArrowRight, ChevronRight } from "lucide-react";
++import { useOrder } from "@/context/OrderContext";
++import { CYLINDER_OPTIONS, type CylinderSize } from "@/types/order";
++
+ export default function OrderQuantityPage() {
++  const router = useRouter();
++  const { order, setCylinder } = useOrder();
++  const [selected, setSelected] = useState<CylinderSize | null>(
++    order.cylinderSize
++  );
++
++  const handleContinue = () => {
++    if (!selected) return;
++    setCylinder(selected);
++    router.push("/customer/orders/vendor-selection");
++  };
++
+   return (
+-    <main>
+-      <h1 className="text-xl font-semibold text-ink-500">
+-        Select Quantity
+-      </h1>
+-      <p className="mt-2 text-sm text-muted-500">
+-        Next step of the Order Gas flow — coming soon.
+-      </p>
+-    </main>
++    <div>
++      {/* Page-scoped breadcrumb + title (kept separate from the shared Navbar) */}
++      <div className="mb-6">
++        <nav className="flex items-center gap-1.5 text-xs text-muted-500">
++          <Link href="/customer/dashboard" className="hover:text-ink-500">
++            Dashboard
++          </Link>
++          <ChevronRight size={12} />
++          <span className="text-ink-500">Order Gas</span>
++        </nav>
++        <h1 className="mt-1 text-2xl font-bold text-ink-500">Order Gas</h1>
++      </div>
++
++      <div className="rounded-2xl border border-border bg-card p-6">
++        <div className="text-center">
++          <h2 className="text-lg font-bold text-ink-500">
++            Select Cylinder Size
++          </h2>
++          <p className="mt-1 text-sm text-muted-500">
++            Choose your preferred Cylinder Size
++          </p>
++        </div>
++
++        <div className="mt-6 rounded-2xl border border-border p-6">
++          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
++            {CYLINDER_OPTIONS.map((option) => {
++              const isSelected = selected === option.size;
++              return (
++                <button
++                  key={option.size}
++                  type="button"
++                  onClick={() => setSelected(option.size)}
++                  className={`flex flex-col items-center rounded-xl border p-4 transition ${
++                    isSelected
++                      ? "border-brand-500 bg-brand-50/60"
++                      : "border-border bg-white hover:bg-muted-50"
++                  }`}
++                >
++                  <div className="relative h-32 w-full">
++                    <Image
++                      src={option.imageSrc}
++                      alt={`${option.label} gas cylinder`}
++                      fill
++                      className="object-contain"
++                    />
++                  </div>
++                  <span className="mt-3 flex items-center gap-1.5 text-base font-semibold text-ink-500">
++                    {option.label}
++                    <ArrowRight size={16} className="text-brand-500" />
++                  </span>
++                </button>
++              );
++            })}
++          </div>
++        </div>
++
++        <button
++          type="button"
++          onClick={handleContinue}
++          disabled={!selected}
++          className="mt-6 w-full rounded-lg bg-brand-500 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
++        >
++          Continue
++        </button>
++      </div>
++    </div>
+   );
+ }
+diff --git a/frontend/app/customer/orders/summary/page.tsx b/frontend/app/customer/orders/summary/page.tsx
+new file mode 100644
+index 0000000..210f09d
+--- /dev/null
++++ b/frontend/app/customer/orders/summary/page.tsx
+@@ -0,0 +1,146 @@
++"use client";
++
++import { useEffect, useMemo, useState } from "react";
++import Link from "next/link";
++import Image from "next/image";
++import { useRouter } from "next/navigation";
++import { ArrowLeft, ArrowRight, ChevronRight, Lock } from "lucide-react";
++import { useOrder } from "@/context/OrderContext";
++import { cylinderLabel } from "@/types/order";
++
++export default function OrderSummaryPage() {
++  const router = useRouter();
++  const { order } = useOrder();
++
++  // Client-side reference shown pre-payment; the backend issues the real
++  // Order.id once /api/orders is called from the Payment stage.
++  const [tempReference, setTempReference] = useState("");
++  useEffect(() => {
++    const id =
++      typeof crypto !== "undefined" && crypto.randomUUID
++        ? crypto.randomUUID()
++        : Math.random().toString(36).slice(2);
++    setTempReference(`${id.slice(0, 8)}…${id.slice(-8)}`);
++  }, []);
++
++  const price = order.pricePerUnit ?? 0;
++  const totalAmount = useMemo(
++    () => price * order.quantity + order.deliveryFee,
++    [price, order.quantity, order.deliveryFee]
++  );
++
++  const isReady = Boolean(order.cylinderSize && order.vendorId);
++
++  return (
++    <div>
++      <div className="mb-6">
++        <nav className="flex items-center gap-1.5 text-xs text-muted-500">
++          <Link href="/customer/dashboard" className="hover:text-ink-500">
++            Dashboard
++          </Link>
++          <ChevronRight size={12} />
++          <span className="text-ink-500">Order Gas</span>
++        </nav>
++        <h1 className="mt-1 text-2xl font-bold text-ink-500">Order Gas</h1>
++      </div>
++
++      <div className="rounded-2xl border border-border bg-card p-6">
++        <button
++          type="button"
++          onClick={() => router.back()}
++          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink-500 hover:bg-brand-50"
++        >
++          <ArrowLeft size={14} /> Back
++        </button>
++
++        <h2 className="mt-5 text-2xl font-bold text-ink-500">
++          Order Summary
++        </h2>
++        <p className="mt-1 text-sm text-muted-500">
++          Review your order details
++        </p>
++
++        {!isReady && (
++          <p className="mt-4 text-sm text-error">
++            Select a cylinder size and vendor first to see your order
++            summary.
++          </p>
++        )}
++
++        <div className="mt-5 overflow-hidden rounded-xl border border-border">
++          <div className="flex items-start gap-4 p-5">
++            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted-50">
++              <Image
++                src="/images/load-cylinder.png"
++                alt="Gas cylinder"
++                fill
++                className="object-contain p-1"
++              />
++            </div>
++
++            <div className="min-w-0 flex-1">
++              <p className="text-base font-bold text-ink-500">
++                {cylinderLabel(order.cylinderSize) || "—"} Cylinder
++              </p>
++              <p className="mt-3 flex items-center justify-between text-sm">
++                <span className="text-muted-500">Quantity</span>
++                <span className="text-ink-500">{order.quantity}</span>
++              </p>
++              <p className="mt-1 flex items-center justify-between text-sm">
++                <span className="text-muted-500">Price</span>
++                <span className="text-ink-500">
++                  ₦{price.toLocaleString()}
++                </span>
++              </p>
++            </div>
++          </div>
++
++          <div className="space-y-3 border-t border-border bg-muted-50/60 p-5 text-sm">
++            <div className="flex items-center justify-between">
++              <span className="text-muted-500">Vendor</span>
++              <span className="text-ink-500">{order.vendorName ?? "—"}</span>
++            </div>
++            <div className="flex items-center justify-between gap-4">
++              <span className="shrink-0 text-muted-500">
++                Delivery Address:
++              </span>
++              <span className="text-right text-ink-500">
++                {order.deliveryAddress ?? "Not selected yet"}
++              </span>
++            </div>
++            <div className="flex items-center justify-between">
++              <span className="text-muted-500">Delivery Fee:</span>
++              <span className="text-ink-500">
++                ₦{order.deliveryFee.toLocaleString()}
++              </span>
++            </div>
++            <div className="flex items-center justify-between">
++              <span className="text-muted-500">Order ID</span>
++              <span className="text-ink-500">{tempReference}</span>
++            </div>
++            <div className="flex items-center justify-between border-t border-border pt-3">
++              <span className="font-bold text-ink-500">Total Amount:</span>
++              <span className="text-lg font-bold text-ink-500">
++                ₦{totalAmount.toLocaleString()}
++              </span>
++            </div>
++          </div>
++        </div>
++
++        <button
++          type="button"
++          onClick={() => router.push("/customer/orders/payment-selection")}
++          disabled={!isReady}
++          className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
++        >
++          Proceed to Checkout <ArrowRight size={16} />
++        </button>
++
++        <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-500">
++          <Lock size={12} />
++          All payments are secured and encrypted
++        </p>
++      </div>
++    </div>
++  );
++}
+diff --git a/frontend/app/customer/orders/vendor-selection/page.tsx b/frontend/app/customer/orders/vendor-selection/page.tsx
+index 81ad3c7..0ee5513 100644
+--- a/frontend/app/customer/orders/vendor-selection/page.tsx
++++ b/frontend/app/customer/orders/vendor-selection/page.tsx
+@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
+ import { Search, ChevronDown, ChevronRight } from "lucide-react";
+ import VendorCard from "@/components/cards/VendorCard";
+ import { getVendors } from "@/services/vendorService";
++import { useOrder } from "@/context/OrderContext";
+ import type { Vendor } from "@/types/vendor";
+ 
+ type SortOption = "nearest" | "top-rated" | "price-low" | "price-high";
+@@ -21,6 +22,7 @@ const PAGE_SIZE = 6;
+ 
+ export default function OrdersPage() {
+   const router = useRouter();
++  const { setVendor } = useOrder();
+ 
+   const [vendors, setVendors] = useState<Vendor[]>([]);
+   const [page, setPage] = useState(1);
+@@ -82,8 +84,15 @@ export default function OrdersPage() {
+   }, [vendors, search, sortBy]);
+ 
+   const handleContinue = () => {
+-    if (!selectedVendorId) return;
+-    router.push(`/customer/orders/quantity?vendorId=${selectedVendorId}`);
++    const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
++    if (!selectedVendor) return;
++
++    setVendor(selectedVendor.id, selectedVendor.name, selectedVendor.pricePerUnit);
++
++    // Delivery Address is a teammate's stage, not yet built — this is the
++    // agreed route name (matches the vendor-selection / payment-selection
++    // naming convention already used in this folder).
++    router.push("/customer/orders/delivery-address");
+   };
+ 
+   return (
+diff --git a/frontend/components/orders/PaymentMethod.tsx b/frontend/components/orders/PaymentMethod.tsx
+index 4cf53bb..21f433a 100644
+--- a/frontend/components/orders/PaymentMethod.tsx
++++ b/frontend/components/orders/PaymentMethod.tsx
+@@ -1,6 +1,7 @@
+ "use client";
+ 
+ import { useState } from "react";
++import { useRouter } from "next/navigation";
+ import { CreditCard, Landmark, Lock, ArrowRight } from "lucide-react";
+ 
+ type Method = "card" | "bank";
+@@ -11,13 +12,18 @@ const OPTIONS: { id: Method; label: string; icon: React.ElementType }[] = [
+ ];
+ 
+ export default function PaymentMethod() {
++  const router = useRouter();
+   const [selected, setSelected] = useState<Method>("card");
+   const [loading, setLoading] = useState(false);
+ 
+   const handleProceed = () => {
+-    // TODO: wire to a real payment/checkout service once the backend
+-    // endpoint exists. Kept as a UI-only stub for now.
+     setLoading(true);
++    if (selected === "card") {
++      router.push("/customer/orders/payment");
++      return;
++    }
++    // Bank transfer has no dedicated screen yet — kept as a UI-only stub
++    // until that flow is designed.
+     setTimeout(() => setLoading(false), 800);
+   };
+ 
+diff --git a/frontend/context/OrderContext.tsx b/frontend/context/OrderContext.tsx
+index e69de29..c2e9822 100644
+--- a/frontend/context/OrderContext.tsx
++++ b/frontend/context/OrderContext.tsx
+@@ -0,0 +1,66 @@
++"use client";
++
++import {
++  createContext,
++  useCallback,
++  useContext,
++  useMemo,
++  useState,
++  type ReactNode,
++} from "react";
++import {
++  DEFAULT_DELIVERY_FEE,
++  initialOrderDraft,
++  type CylinderSize,
++  type OrderDraft,
++} from "@/types/order";
++
++interface OrderContextValue {
++  order: OrderDraft;
++  setCylinder: (size: CylinderSize, quantity?: number) => void;
++  setVendor: (vendorId: string, vendorName: string, pricePerUnit: number) => void;
++  setDeliveryAddress: (address: string, fee?: number) => void;
++  resetOrder: () => void;
++}
++
++const OrderContext = createContext<OrderContextValue | undefined>(undefined);
++
++export function OrderProvider({ children }: { children: ReactNode }) {
++  const [order, setOrder] = useState<OrderDraft>(initialOrderDraft);
++
++  const setCylinder = useCallback((size: CylinderSize, quantity = 1) => {
++    setOrder((prev) => ({ ...prev, cylinderSize: size, quantity }));
++  }, []);
++
++  const setVendor = useCallback(
++    (vendorId: string, vendorName: string, pricePerUnit: number) => {
++      setOrder((prev) => ({ ...prev, vendorId, vendorName, pricePerUnit }));
++    },
++    []
++  );
++
++  // Exposed for the Delivery Address stage to call once it's built.
++  const setDeliveryAddress = useCallback(
++    (address: string, fee: number = DEFAULT_DELIVERY_FEE) => {
++      setOrder((prev) => ({ ...prev, deliveryAddress: address, deliveryFee: fee }));
++    },
++    []
++  );
++
++  const resetOrder = useCallback(() => setOrder(initialOrderDraft), []);
++
++  const value = useMemo(
++    () => ({ order, setCylinder, setVendor, setDeliveryAddress, resetOrder }),
++    [order, setCylinder, setVendor, setDeliveryAddress, resetOrder]
++  );
++
++  return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>;
++}
++
++export function useOrder(): OrderContextValue {
++  const context = useContext(OrderContext);
++  if (!context) {
++    throw new Error("useOrder must be used within an OrderProvider");
++  }
++  return context;
++}
+diff --git a/frontend/types/order.ts b/frontend/types/order.ts
+index e69de29..f77ede0 100644
+--- a/frontend/types/order.ts
++++ b/frontend/types/order.ts
+@@ -0,0 +1,48 @@
++// Mirrors the backend CylinderSize enum (backend/prisma/schema.prisma).
++// KG_3 exists on the backend but isn't offered in this flow's UI.
++export type CylinderSize = "KG_6" | "KG_12" | "KG_12_5" | "KG_25";
++
++export interface CylinderOption {
++  size: CylinderSize;
++  label: string;
++  imageSrc: string;
++}
++
++export const CYLINDER_OPTIONS: CylinderOption[] = [
++  { size: "KG_6", label: "6Kg", imageSrc: "/images/load-cylinder.png" },
++  { size: "KG_12", label: "12Kg", imageSrc: "/images/load-cylinder.png" },
++  { size: "KG_12_5", label: "12.5Kg", imageSrc: "/images/load-cylinder.png" },
++  { size: "KG_25", label: "25Kg", imageSrc: "/images/load-cylinder.png" },
++];
++
++export function cylinderLabel(size: CylinderSize | null): string {
++  return CYLINDER_OPTIONS.find((option) => option.size === size)?.label ?? "";
++}
++
++// Flat, shared draft of the in-progress Order Gas flow. Each stage reads
++// what it needs and writes what it owns; nothing is persisted to the
++// backend until the final Payment stage.
++export interface OrderDraft {
++  cylinderSize: CylinderSize | null;
++  quantity: number;
++
++  vendorId: string | null;
++  vendorName: string | null;
++  pricePerUnit: number | null;
++
++  // Written by the Delivery Address stage (owned by a teammate).
++  deliveryAddress: string | null;
++  deliveryFee: number;
++}
++
++export const DEFAULT_DELIVERY_FEE = 1000;
++
++export const initialOrderDraft: OrderDraft = {
++  cylinderSize: null,
++  quantity: 1,
++  vendorId: null,
++  vendorName: null,
++  pricePerUnit: null,
++  deliveryAddress: null,
++  deliveryFee: DEFAULT_DELIVERY_FEE,
++};

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Search, ChevronDown, ChevronRight } from "lucide-react";
 import VendorCard from "@/components/cards/VendorCard";
 import { getVendors } from "@/services/vendorService";
+import { useOrder } from "@/context/OrderContext";
 import type { Vendor } from "@/types/vendor";
 
 type SortOption = "nearest" | "top-rated" | "price-low" | "price-high";
@@ -21,6 +22,7 @@ const PAGE_SIZE = 6;
 
 export default function OrdersPage() {
   const router = useRouter();
+  const { setVendor } = useOrder();
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [page, setPage] = useState(1);
@@ -82,8 +84,15 @@ export default function OrdersPage() {
   }, [vendors, search, sortBy]);
 
   const handleContinue = () => {
-    if (!selectedVendorId) return;
-    router.push(`/customer/orders/quantity?vendorId=${selectedVendorId}`);
+    const selectedVendor = vendors.find((v) => v.id === selectedVendorId);
+    if (!selectedVendor) return;
+
+    setVendor(selectedVendor.id, selectedVendor.name, selectedVendor.pricePerUnit);
+
+    // Delivery Address is a teammate's stage, not yet built — this is the
+    // agreed route name (matches the vendor-selection / payment-selection
+    // naming convention already used in this folder).
+    router.push("/customer/orders/delivery-address");
   };
 
   return (
