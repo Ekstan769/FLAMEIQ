@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 import multer from 'multer';
 import { notificationService } from './services/notificationService.js'
 import { predictionJob } from './jobs/predictionJob.js';
-import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, forgotPassword, getMe, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
+import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, flagVendor, forgotPassword, getMe, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
 import { uploadProfilePicture } from './controllers/uploadController.js';
 import orderRoutes from './routes/orderRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
@@ -287,6 +287,43 @@ app.get('/api/users', authenticate, authorizeAdmin, getUsers);
  *         description: User soft-deleted successfully
  */
 app.delete('/api/users/:id', authenticate, authorizeAdmin, deleteUsers);
+
+/**
+ * @swagger
+ * /api/users/{id}/flag:
+ *   patch:
+ *     summary: Flag a vendor (Admin only). 3 flags auto-deletes the vendor account.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The vendor's user ID.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Reason for flagging the vendor.
+ *     responses:
+ *       200:
+ *         description: Vendor flagged successfully. Returns flag count and auto-delete status.
+ *       400:
+ *         description: Invalid request or user is not a vendor.
+ *       404:
+ *         description: Vendor not found.
+ */
+app.patch('/api/users/:id/flag', authenticate, authorizeAdmin, flagVendor);
 
 // NOTE: SSE notification stream is registered below alongside payment routes (authenticated, per-user)
 

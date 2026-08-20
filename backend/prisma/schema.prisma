@@ -121,6 +121,8 @@ model Profile {
   longitude    Float?
   isVerified   Boolean     @default(false)
   walletBalance Decimal    @default(0.00) // In-app wallet balance
+  flagCount    Int         @default(0) // Progressive discipline counter for vendors
+  flagReason   String?     // Reason for the most recent flag
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
   deletedAt    DateTime?

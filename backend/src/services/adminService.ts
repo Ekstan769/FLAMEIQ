@@ -55,6 +55,8 @@ export const getAllUsers = async (options: GetAllUsersOptions = {}) => {
               address: true,
               isVerified: true,
               walletBalance: true,
+              flagCount: true,
+              flagReason: true,
             },
           },
           _count: {
@@ -82,6 +84,69 @@ export const getAllUsers = async (options: GetAllUsersOptions = {}) => {
     };
   } catch (error) {
     logger.error({ err: error }, "Database error while fetching all users");
+    throw error;
+  }
+};
+
+/**
+ * Flags a vendor. After 3 flags the vendor account is automatically soft-deleted.
+ * Returns the updated flag count and whether the vendor was auto-deleted.
+ */
+export const flagVendor = async (vendorId: string, reason: string) => {
+  try {
+    // Verify the user exists and has a VENDOR profile
+    const user = await prisma.user.findUnique({
+      where: { id: vendorId, deletedAt: null },
+      include: { profile: true },
+    });
+
+    if (!user) {
+      return { error: 'User not found or already deleted.', status: 404 };
+    }
+
+    if (!user.profile || user.profile.profileType !== 'VENDOR') {
+      return { error: 'User is not a vendor.', status: 400 };
+    }
+
+    const newFlagCount = user.profile.flagCount + 1;
+    const autoDeleted = newFlagCount >= 3;
+
+    // Update flag count and reason in a transaction
+    await prisma.$transaction(async (tx) => {
+      await tx.profile.update({
+        where: { userId: vendorId },
+        data: {
+          flagCount: newFlagCount,
+          flagReason: reason,
+        },
+      });
+
+      // Auto-delete vendor after 3 flags
+      if (autoDeleted) {
+        await tx.user.update({
+          where: { id: vendorId },
+          data: { deletedAt: new Date() },
+        });
+        await tx.profile.update({
+          where: { userId: vendorId },
+          data: { deletedAt: new Date() },
+        });
+      }
+    });
+
+    logger.info(
+      `Vendor ${vendorId} flagged (${newFlagCount}/3). Reason: ${reason}.${autoDeleted ? ' Auto-deleted.' : ''}`
+    );
+
+    return {
+      flagCount: newFlagCount,
+      autoDeleted,
+      message: autoDeleted
+        ? `Vendor has been flagged ${newFlagCount} times and has been automatically deleted.`
+        : `Vendor has been flagged. Current flag count: ${newFlagCount}/3.`,
+    };
+  } catch (error) {
+    logger.error({ err: error }, `Failed to flag vendor ${vendorId}`);
     throw error;
   }
 };
