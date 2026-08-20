@@ -334,7 +334,7 @@ app.delete('/api/users/:id', authenticate, authorizeAdmin, deleteUsers);
  *       404:
  *         description: Vendor not found.
  */
-app.patch('/api/users/:id/flag', authenticate, authorizeAdmin, flagVendor);
+//app.patch('/api/users/:id/flag', authenticate, authorizeAdmin, flagVendor);
 
 /**
  * @swagger
@@ -348,7 +348,7 @@ app.patch('/api/users/:id/flag', authenticate, authorizeAdmin, flagVendor);
  *       200:
  *         description: Platform total profit calculated from successful payments
  */
-app.get('/api/admin/profit', authenticate, authorizeAdmin, getTotalProfit);
+//app.get('/api/admin/profit', authenticate, authorizeAdmin, getTotalProfit);
 
 // NOTE: SSE notification stream is registered below alongside payment routes (authenticated, per-user)
 
