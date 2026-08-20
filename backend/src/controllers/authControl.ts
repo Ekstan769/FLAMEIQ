@@ -399,7 +399,13 @@ export const resetPassword = async (req: Request, res: Response) => {
 
 //get all users to be used by admin
 export const getUsers = async (req: Request, res: Response) => {
-    const users = await adminService.getAllUsers();
+    const { page, limit, search, profileType } = req.query;
+    const result = await adminService.getAllUsers({
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      search: search ? String(search) : undefined,
+      profileType: profileType ? String(profileType) : undefined,
+    });
 
     return res.status(200).json({
       success: true,
@@ -408,8 +414,38 @@ export const getUsers = async (req: Request, res: Response) => {
     });
 };
 
-export const deleteUsers = (req: Request, res: Response) => {
-  return adminService.adminDeleteUser(req, res);
+export const deleteUsers = async (req: Request, res: Response) => {
+  const targetUserId = req.params.id;
+  const adminId = req.user!.id;
+  const result = await adminService.adminDeleteUser(targetUserId, adminId);
+
+  if ('error' in result) {
+    return res.status((result as { error: string; status: number }).status).json({ success: false, message: result.error });
+  }
+
+  return res.status(200).json({ success: true, ...result });
+};
+
+export const flagVendor = async (req: Request, res: Response) => {
+  const vendorId = req.params.id;
+  const { reason } = req.body;
+
+  if (!reason) {
+    return res.status(400).json({ success: false, message: 'Reason is required to flag a vendor.' });
+  }
+
+  const result = await adminService.flagVendor(vendorId, reason);
+
+  if ('error' in result) {
+    return res.status((result as { error: string; status: number }).status).json({ success: false, message: result.error });
+  }
+
+  return res.status(200).json({ success: true, ...result });
+};
+
+export const getTotalProfit = async (_req: Request, res: Response) => {
+  const result = await adminService.getTotalProfit();
+  return res.status(200).json({ success: true, data: result });
 };
 
 export const deleteSelf = (req: Request, res: Response) => {
