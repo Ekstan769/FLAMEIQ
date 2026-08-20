@@ -94,6 +94,7 @@ app.post('/api/auth/signup', authLimiter, signUp)
  */
 app.post('/api/auth/verify-otp', authLimiter, verifyOtp);
 
+
 /**
  * @swagger
  * /api/auth/signin:

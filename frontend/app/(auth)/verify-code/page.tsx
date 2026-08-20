@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Mail } from "lucide-react";
 import OtpInput from "@/components/ui/OtpInput";
 import AuthIconBadge from "@/components/ui/AuthIconBadge";
-import AuthScreenHeader from "@/components/layout/AuthScreenHeader";
 import { verifyResetCode, sendPasswordReset } from "@/services/authService";
 import SuccessModal from "@/components/modals/SuccessModal";
 
@@ -48,8 +47,6 @@ function VerifyCodeContent() {
 
   return (
     <div className="w-full max-w-sm">
-      <AuthScreenHeader />
-
       <div className="text-center">
         <AuthIconBadge>
           <Mail size={22} className="text-link-500" />

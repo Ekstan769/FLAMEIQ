@@ -275,19 +275,44 @@ export const signIn = async (req: Request, res: Response) =>{
     const clientIp = (req as any).clientIp || req.ip || '0.0.0.0';
     const userAgent = req.headers['user-agent'] || 'unknown';
     await prisma.loginHistory.create({
-      data: {
-        userId: user.id,
-        ipAddress: clientIp,
-        userAgent: userAgent
-      }
-    });
-    logger.info(`User ${user.email} signed in from IP ${clientIp}`);
 
+    const payload = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const secret = process.env.JWT_SECRET || '';
+    const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || "1d" });
+
+
+    return res.status(200).json({
+      success: true,
+      message: "Sign-in completed",
+      token,
+      user:{
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profile: user.profile,
+      },
+    });
+    await prisma.otpVerification.update({ where: { id: otpRecord.id }, data: { usedAt: new Date() } });
+
+<<<<<<< HEAD
+    return res.status(200).json({ success: true, message: 'Password reset successful.' });
+  } catch (error) {
+    logger.error({ err: error }, 'Reset password failed');
+    return res.status(500).json({ success: false, message: 'Failed to reset password.' });
+  }
+=======
 
 const payload = {
   id: user.id,
   email: user.email,
   role: user.role,
+>>>>>>> 752a3730cdc96e0a8bbca82437808ae83c3c68d9
 };
 
 // 2. Pass the clean payload and cast the options
