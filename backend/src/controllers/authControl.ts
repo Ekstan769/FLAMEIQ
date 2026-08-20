@@ -481,6 +481,22 @@ export const deleteSelf = async (req: Request, res: Response) => {
   // The service function handles the response.
   return adminService.selfDeleteUser(req, res);
 };
+
+export const getTotalProfit = async (req: Request, res: Response) => {
+  try {
+    const profitData = await adminService.getTotalProfit();
+    return res.status(200).json({
+      success: true,
+      data: profitData,
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Error fetching total profit');
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to calculate total profit',
+    });
+  }
+};
 export const updateProfile = async (req: Request, res: Response) => {
   try {
     if (!req.user?.id) {

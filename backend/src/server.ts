@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 import multer from 'multer';
 import { notificationService } from './services/notificationService.js'
 import { predictionJob } from './jobs/predictionJob.js';
-import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, flagVendor, forgotPassword, getMe, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
+import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, flagVendor, forgotPassword, getMe, getTotalProfit, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
 import { uploadProfilePicture } from './controllers/uploadController.js';
 import orderRoutes from './routes/orderRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
@@ -324,6 +324,20 @@ app.delete('/api/users/:id', authenticate, authorizeAdmin, deleteUsers);
  *         description: Vendor not found.
  */
 app.patch('/api/users/:id/flag', authenticate, authorizeAdmin, flagVendor);
+
+/**
+ * @swagger
+ * /api/admin/profit:
+ *   get:
+ *     summary: Get total platform profit (Admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Platform total profit calculated from successful payments
+ */
+app.get('/api/admin/profit', authenticate, authorizeAdmin, getTotalProfit);
 
 // NOTE: SSE notification stream is registered below alongside payment routes (authenticated, per-user)
 

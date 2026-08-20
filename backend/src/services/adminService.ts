@@ -222,3 +222,37 @@ export const selfDeleteUser = async (req: Request, res: Response): Promise<Respo
     return res.status(500).json({ success: false, message: "An unexpected server error occurred." });
   }
 };
+
+/**
+ * Calculates total platform profit by summing the commission field on all SUCCESSFUL PAYMENT transactions.
+ */
+export const getTotalProfit = async () => {
+  try {
+    const aggregations = await prisma.transaction.aggregate({
+      where: {
+        type: 'PAYMENT',
+        status: 'SUCCESS',
+      },
+      _sum: {
+        commission: true,
+        amount: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const totalProfit = aggregations._sum.commission || 0;
+    const totalRevenue = aggregations._sum.amount || 0;
+    const totalTransactions = aggregations._count.id || 0;
+
+    return {
+      totalProfit,
+      totalRevenue,
+      totalTransactions,
+    };
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to calculate total profit');
+    throw error;
+  }
+};
