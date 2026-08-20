@@ -28,7 +28,13 @@ export const createOrder = async (req: Request, res: Response): Promise<Response
  */
 export const getOrders = async (req: Request, res: Response): Promise<Response> => {
   const userId = req.user!.id;
-  const profileType = req.user!.profile?.profileType;
+  // The authenticate middleware only sets id + role, not profile.
+  // Look up the profile type to decide which order query to run.
+  const profile = await prisma.profile.findUnique({
+    where: { userId },
+    select: { profileType: true },
+  });
+  const profileType = profile?.profileType;
 
   let orders;
   if (profileType === ProfileType.VENDOR) {
@@ -46,7 +52,11 @@ export const getOrders = async (req: Request, res: Response): Promise<Response> 
 export const getOrderById = async (req: Request, res: Response): Promise<Response> => {
     const { id: orderId } = req.params;
     const userId = req.user!.id;
-    const profileType = req.user!.profile?.profileType;
+    const profile = await prisma.profile.findUnique({
+      where: { userId },
+      select: { profileType: true },
+    });
+    const profileType = profile?.profileType;
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
