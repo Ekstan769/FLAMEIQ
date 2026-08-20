@@ -1,35 +1,40 @@
 import forge from 'node-forge';
+import { config } from '../config/index.js';
+import { AppError } from '../utils/errors.js';
 
 /**
- * Encrypts a string payload using RSA with a public key.
- * This function is typically used on the CLIENT-SIDE (e.g., browser or mobile app)
- * to encrypt sensitive data before sending it to the backend.
+ * Encrypts a string payload using the configured Flutterwave RSA public key.
+ * This function is designed for server-side use, leveraging the public key
+ * from the application's configuration.
  *
- * @param publicKeyB64 - The Base64 encoded public key from the payment provider.
  * @param payload - The string data to encrypt (e.g., credit card details as a JSON string).
  * @returns The Base64 encoded encrypted payload.
+ * @throws {AppError} If the public key is not configured or if encryption fails.
  */
-const encryptWithPublicKey = (publicKeyB64: string, payload: string): string => {
-  try {
-    // Decode the Base64 public key to its binary representation
-    const publicKeyPem = forge.util.decode64(publicKeyB64);
+const encryptForGateway = (payload: string): string => {
+  const publicKeyPem = config.flutterwavePublicKey;
+  if (!publicKeyPem) {
+    // Fail-fast if the key is missing in the environment configuration.
+    throw new AppError('Payment gateway public key is not configured.', 503, );
+  }
 
-    // Create a public key object from the PEM-encoded key
+  try {
+    // Create a public key object directly from the PEM-formatted string.
+    // The `forge.util.decode64` step was incorrect as PEM is already a Base64 format.
     const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
 
     // Encrypt the payload using RSA-OAEP. OAEP is the recommended padding scheme.
     const encryptedBytes = publicKey.encrypt(payload, 'RSA-OAEP');
 
-    // Encode the encrypted bytes to Base64 to safely transmit them
-    const encryptedB64 = forge.util.encode64(encryptedBytes);
-
-    return encryptedB64;
+    // Encode the encrypted bytes to Base64 for safe transmission.
+    return forge.util.encode64(encryptedBytes);
   } catch (error) {
     console.error('RSA encryption failed:', error);
-    throw new Error('Failed to encrypt data.');
+    // Use the application's custom error for consistent error handling.
+    throw new AppError('Failed to encrypt data due to a cryptographic error.', 500);
   }
 };
 
 export const encryptionService = {
-  encryptWithPublicKey,
+  encryptForGateway,
 };

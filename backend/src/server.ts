@@ -1,7 +1,7 @@
 import './types/express.d.js';
 import express from 'express'
-import { corsConfig } from './middleware/corsConfig.js';
 import dotenv from 'dotenv'
+import { corsConfig } from './middleware/corsConfig.js';
 import { config } from './config/index.js';
 import { fileURLToPath } from 'url'
 import multer from 'multer';
@@ -10,31 +10,35 @@ import { predictionJob } from './jobs/predictionJob.js';
 import { payoutJob } from './jobs/payoutJob.js';
 import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, forgotPassword, getMe, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
 import { uploadProfilePicture } from './controllers/uploadController.js';
-import orderRoutes from './routes/orderRoutes.js';
-import paymentRoutes from './routes/paymentRoutes.js';
-import payoutRoutes from './routes/payoutRoutes.js';
-import cylinderRoutes from './routes/cylinderRoutes.js';
-import reviewRoutes from './routes/reviewRoutes.js';
+import { encryptionController } from './controllers/encryptionController.js';
+import orderRoutes from './routesF/orderRoutes.js';
+import paymentRoutes from './routesF/paymentRoutes.js';
+import payoutRoutes from './routesF/payoutRoutes.js';
+import cylinderRoutes from './routesF/cylinderRoutes.js';
+import reviewRoutes from './routesF/reviewRoutes.js';
 //import predictionRoutes from './routes/predictionRoutes.js';
-import routesRouter from './routes/routes.js';
+import createRoutesRouter from './routesF/routes.js';
 import ipTracker from './utils/ipTracker.js';
 import httpLogger from './utils/httpLogger.js';
 import { setupSwagger } from './config/swagger.js';
 import { generalLimiter, authLimiter } from './middleware/rateLimiter.js';
+import { errorHandler } from './middleware/errorHandler.js';
 // dotenv.config() is now handled by src/config/index.ts
 dotenv.config()
 
+
 const app = express()
+
 app.use(corsConfig)
 app.use(express.json())
-
-// Multer setup for in-memory file storage
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
 
 app.use(ipTracker)
 app.use(httpLogger)
 app.use(generalLimiter);
+
+// Multer setup for in-memory file storage
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 setupSwagger(app)
 
@@ -607,7 +611,6 @@ app.use('/api/cylinders', cylinderRoutes);
  *         description: Invalid input, not authorized, or review already exists.
  */
 app.use('/api/reviews', reviewRoutes);
-app.use('/routes', routesRouter);
 
 // --- Prediction Routes ---
 /**
@@ -655,6 +658,33 @@ app.use('/routes', routesRouter);
 app.use('/api/payouts', payoutRoutes);
 // --- Payment Routes (initiate, verify, wallet, webhook) ---
 app.use('/api/payments', paymentRoutes);
+
+// --- Encryption Route ---
+/**
+ * @swagger
+ * /api/encrypt:
+ *   post:
+ *     summary: Encrypt a payload for the payment gateway
+ *     tags: [Utility]
+ *     description: >
+ *       Encrypts a string payload using the payment gateway's public key.
+ *       **WARNING**: For PCI compliance, sensitive card data (PAN, CVV) should be
+ *       encrypted on the client-side, not sent to the server for encryption. This
+ *       endpoint receives the payload in plaintext.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               payload:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Payload encrypted successfully.
+ */
+app.post('/api/encrypt', encryptionController.encryptPayload);
 
 // --- Real-time Notifications (Server-Sent Events) ---
 // GET /api/notifications/stream — authenticated users subscribe to their own event stream
@@ -704,6 +734,12 @@ app.patch('/api/notifications/:id/read', authenticate, async (req, res) => {
   }
 });
 
+// --- Developer Route Listing (must be last to see all routes) ---
+app.use('/routes', createRoutesRouter(app));
+
+// --- Global Error Handler (must be the last middleware) ---
+app.use(errorHandler);
+
 const PORT = config.port;
 
 const isDirectRun =
@@ -717,9 +753,11 @@ if (isDirectRun) {
   if (config.enablePredictionJob) predictionJob.start();
   if (config.enablePayoutJob) payoutJob.start(); // Start the new payout job
 
-  app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`)
-  })
+  setTimeout(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`)
+    })
+  }, 0);
 }
 
 export default app

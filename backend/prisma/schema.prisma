@@ -125,6 +125,7 @@ model Profile {
   latitude          Float?
   longitude         Float?
   isVerified        Boolean     @default(false)
+  flutterwaveCustomerId String? @unique
   walletBalance     Decimal     @default(0.00) // In-app wallet balance
   bankCode          String?
   bankAccountNumber String?

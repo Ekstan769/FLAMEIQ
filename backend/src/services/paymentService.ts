@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from '@/db/prisma.js';
 import { logger } from '@/utils/logger.js';
+import { Prisma, PrismaClient } from '../generated/prisma/client.js';
 import { AppError } from '@/utils/errors.js';
 import { Order, Payout, PayoutStatus, Transaction, TxStatus, TxType } from '../generated/prisma/client.js';
 import { config } from '../config/index.js';
@@ -67,33 +68,57 @@ async function flutterwaveApiCall(
 }
 
 /**
+ * Retrieves a Flutterwave customer ID for a user, creating one if it doesn't exist.
+ * This function is designed to be used within a Prisma transaction.
+ * @param tx The Prisma transaction client.
+ * @param userId The ID of the user.
+ * @returns The Flutterwave customer ID.
+ */
+async function _getOrCreateFlutterwaveCustomer(
+  tx: Prisma.TransactionClient,
+  userId: string
+): Promise<string> {
+  const profile = await tx.profile.findUnique({ where: { userId }, select: { flutterwaveCustomerId: true, user: { select: { email: true, name: true } } } });
+
+  if (!profile?.user) {
+    throw new AppError('User not found for customer creation.', 404);
+  }
+
+  if (profile.flutterwaveCustomerId) {
+    return profile.flutterwaveCustomerId;
+  }
+
+  logger.info(`No Flutterwave customer ID found for user ${userId}. Creating a new one.`);
+  const customerData = await flutterwaveApiCall('/customers', 'POST', {
+    email: profile.user.email,
+    name: profile.user.name,
+  });
+
+  const customerId = customerData.data.id as string;
+
+  // Store the new customer ID for future use
+  await tx.profile.update({ where: { userId }, data: { flutterwaveCustomerId: customerId } });
+
+  return customerId;
+}
+
+/**
  * Creates a virtual account for a given order.
  * @param order The order object from the database.
  * @param transaction The associated transaction object.
  * @returns The virtual account data from Flutterwave.
  */
 async function createVirtualAccountForOrder(order: Order, transaction: Transaction) {
-  const user = await prisma.user.findUnique({ where: { id: order.userId } });
-  if (!user) {
-    throw new AppError('User associated with the order not found.', 404);
-  }
-
-  // Step 1: Create a Flutterwave Customer if one doesn't exist.
-  // In a real app, you'd store and reuse the flutterwaveCustomerId.
-  const customerData = await flutterwaveApiCall('/customers', 'POST', {
-    email: user.email,
-    name: user.name,
-    // phone: user.profile.phone // Assuming you fetch profile with user
+  const customerId = await prisma.$transaction(async (tx) => {
+    return _getOrCreateFlutterwaveCustomer(tx, order.userId);
   });
-  const customer_id = customerData.data.id;
 
-  // Step 2: Create the virtual account
   const virtualAccountData = await flutterwaveApiCall(
     '/virtual-accounts',
     'POST',
     {
       reference: transaction.reference,
-      customer_id,
+      customer_id: customerId,
       expiry: 60, // 60 minutes
       amount: order.totalAmount,
       currency: 'NGN',
@@ -117,39 +142,34 @@ async function createVirtualAccountForOrder(order: Order, transaction: Transacti
 async function initiateCardPayment(
   order: Order,
   transaction: Transaction,
-  encryptedCardDetails: object,
+  encryptedData: string,
   redirectUrl: string
 ) {
-  const user = await prisma.user.findUnique({ where: { id: order.userId } });
-  if (!user) {
-    throw new AppError('User associated with the order not found.', 404);
-  }
-
-  // Step 1: Create a Flutterwave Customer.
-  // In a real app, you'd store and reuse the flutterwaveCustomerId.
-  const customerData = await flutterwaveApiCall('/customers', 'POST', {
-    email: user.email,
-    name: user.name,
+  const customerId = await prisma.$transaction(async (tx) => {
+    return _getOrCreateFlutterwaveCustomer(tx, order.userId);
   });
-  const customer_id = customerData.data.id;
 
-  // Step 2: Create a Card Payment Method from the encrypted details.
   const paymentMethodData = await flutterwaveApiCall('/payment-methods', 'POST', {
     type: 'card',
-    card: encryptedCardDetails,
+    encrypted_data: encryptedData,
   });
   const payment_method_id = paymentMethodData.data.id;
 
   // Step 3: Create the Charge.
-  const chargeData = await flutterwaveApiCall('/charges', 'POST', {
-    amount: order.totalAmount,
-    currency: 'NGN',
-    reference: transaction.reference,
-    customer_id,
-    payment_method_id,
-    redirect_url: redirectUrl,
-    meta: { order_id: order.id },
-  });
+  const chargeData = await flutterwaveApiCall(
+    '/charges',
+    'POST',
+    {
+      amount: order.totalAmount,
+      currency: 'NGN',
+      reference: transaction.reference,
+      customer_id: customerId,
+      payment_method_id,
+      redirect_url: redirectUrl,
+      meta: { order_id: order.id },
+    },
+    transaction.reference // Add idempotency key
+  );
 
   logger.info(`Card charge initiated for order reference: ${transaction.reference}`);
   return chargeData.data;
@@ -165,22 +185,15 @@ async function initiateTokenizedCardPayment(
   paymentMethodId: string,
   redirectUrl: string,
 ) {
-  const user = await prisma.user.findUnique({ where: { id: order.userId } });
-  if (!user) {
-    throw new AppError('User associated with the order not found.', 404);
-  }
-
-  const customerData = await flutterwaveApiCall('/customers', 'POST', {
-    email: user.email,
-    name: user.name,
+  const customerId = await prisma.$transaction(async (tx) => {
+    return _getOrCreateFlutterwaveCustomer(tx, order.userId);
   });
-  const customer_id = customerData.data.id;
 
   const chargeData = await flutterwaveApiCall('/charges', 'POST', {
     amount: order.totalAmount,
     currency: 'NGN',
     reference: transaction.reference,
-    customer_id,
+    customer_id: customerId,
     payment_method_id: paymentMethodId,
     redirect_url: redirectUrl,
     meta: { order_id: order.id },
@@ -354,7 +367,7 @@ async function processPendingPayouts() {
           code: vendorProfile.bankCode,
           accountNumber: vendorProfile.bankAccountNumber,
         };
-        const flutterwaveResponse = await initiateVendorPayout(payout, bankDetails);
+        const flutterwaveResponse = await _initiateVendorPayout(payout, bankDetails);
 
         // Store gateway's transfer ID. Status will be updated by webhook.
         await tx.transaction.update({
@@ -387,8 +400,13 @@ async function processPendingPayouts() {
 async function processPayoutDisbursement(eventData: any) {
   const { reference, status, id: gatewayReference } = eventData;
 
-  const payoutStatus = status === 'SUCCESSFUL' ? 'PAID' : 'FAILED';
-  const transactionStatus = status === 'SUCCESSFUL' ? 'SUCCESS' : 'FAILED';
+  const statusMap = {
+    SUCCESSFUL: { payout: PayoutStatus.PAID, transaction: TxStatus.SUCCESS },
+    FAILED: { payout: PayoutStatus.FAILED, transaction: TxStatus.FAILED },
+  };
+
+  const newStatuses = statusMap[status as keyof typeof statusMap] ?? statusMap.FAILED;
+
 
   await prisma.$transaction(async (tx) => {
     // Find the payout by its unique reference
@@ -403,17 +421,17 @@ async function processPayoutDisbursement(eventData: any) {
     // Update the Payout status
     await tx.payout.update({
       where: { id: payout.id },
-      data: { status: payoutStatus as PayoutStatus }, // Cast to PayoutStatus enum
+      data: { status: newStatuses.payout },
     });
 
     // Update the corresponding PAYOUT Transaction status
     await tx.transaction.update({
       where: { reference }, // Payout and its Transaction share a reference
-      data: { status: transactionStatus as TxStatus, gatewayReference }, // Cast to TxStatus enum
+      data: { status: newStatuses.transaction, gatewayReference },
     });
   });
 
-  if (payoutStatus === 'PAID') {
+  if (newStatuses.payout === PayoutStatus.PAID) {
     logger.info(`Successfully processed payout for reference: ${reference}`);
   } else {
     logger.error(`Processing FAILED payout for reference: ${reference}. Manual investigation required.`);
@@ -424,7 +442,7 @@ async function processPayoutDisbursement(eventData: any) {
  * @param payout The payout record from the database.
  * @param bankDetails The vendor's bank details.
  */
-async function initiateVendorPayout(payout: Payout, bankDetails: { code: string; accountNumber: string }) {
+async function _initiateVendorPayout(payout: Payout, bankDetails: { code: string; accountNumber: string }) {
   const { reference, amount } = payout;
   const payload = {
     action: 'instant',
@@ -445,13 +463,13 @@ async function initiateVendorPayout(payout: Payout, bankDetails: { code: string;
 }
 
 export const paymentService = {
+  // _getOrCreateFlutterwaveCustomer is internal and not exported
   createVirtualAccountForOrder,
   initiateCardPayment,
   initiateTokenizedCardPayment,
   initiateWalletFunding,
   verifyWebhookSignature,
-  processSuccessfulCharge,
-  initiateVendorPayout,
+  processSuccessfulCharge,  
   processPendingPayouts,
   processPayoutDisbursement,
 };
