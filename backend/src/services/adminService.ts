@@ -3,27 +3,83 @@ import { prisma } from "../db/prisma.js";
 import { logger } from "../utils/logger.js";
 
 /**
- * Fetches all registered users from the database.
+ * Query options for the admin user list.
+ */
+interface GetAllUsersOptions {
+  page?: number;
+  limit?: number;
+  search?: string;
+  profileType?: string; // 'USER' | 'VENDOR' | 'ADMIN'
+}
+
+/**
+ * Fetches all registered users with profile data, pagination, search, and filtering.
  * Passwords are automatically excluded for security.
  */
-export const getAllUsers = async () => {
-  try {
-    const users = await prisma.user.findMany({
-      where: {
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-      },
-      orderBy: {
-        name: 'asc',
-      },
-    });
+export const getAllUsers = async (options: GetAllUsersOptions = {}) => {
+  const { page = 1, limit = 20, search, profileType } = options;
+  const skip = (page - 1) * limit;
 
-    return users;
+  try {
+    // Build dynamic where clause
+    const where: Record<string, unknown> = { deletedAt: null };
+
+    // Search by name or email
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Filter by profile type (USER, VENDOR, ADMIN)
+    if (profileType) {
+      where.profile = { profileType };
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          profile: {
+            select: {
+              profileType: true,
+              businessName: true,
+              phone: true,
+              profilePic: true,
+              address: true,
+              isVerified: true,
+              walletBalance: true,
+            },
+          },
+          _count: {
+            select: {
+              orders: true,
+              vendorOrders: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return {
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   } catch (error) {
     logger.error({ err: error }, "Database error while fetching all users");
     throw error;

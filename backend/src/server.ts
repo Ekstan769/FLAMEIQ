@@ -240,13 +240,37 @@ app.delete('/api/auth/me', authenticate, deleteSelf);
  * @swagger
  * /api/users:
  *   get:
- *     summary: Get all users (Admin only)
+ *     summary: Get all users with profiles, pagination, and filtering (Admin only)
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination.
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of users per page (max 100).
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search users by name or email.
+ *       - in: query
+ *         name: profileType
+ *         schema:
+ *           type: string
+ *           enum: [USER, VENDOR, ADMIN]
+ *         description: Filter users by profile type.
  *     responses:
  *       200:
- *         description: A list of users
+ *         description: A paginated list of users with profile data.
  */
 app.get('/api/users', authenticate, authorizeAdmin, getUsers);
 

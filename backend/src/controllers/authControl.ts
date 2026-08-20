@@ -406,15 +406,19 @@ export const resetPassword = async (req: Request, res: Response) => {
 //get all users to be used by admin
 export const getUsers = async (req: Request, res: Response) => {
   try {
-    const users = await adminService.getAllUsers();
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const search = (req.query.search as string) || undefined;
+    const profileType = (req.query.profileType as string) || undefined;
 
-    // Return a structured, successful JSON response
+    const result = await adminService.getAllUsers({ page, limit, search, profileType });
+
     return res.status(200).json({
       success: true,
-      data: users
+      data: result.users,
+      pagination: result.pagination,
     });
   } catch (error) {
-    // The service already logged the full trace, so just sending the user response here
     return res.status(500).json({
       success: false,
       message: "Failed to fetch users"
