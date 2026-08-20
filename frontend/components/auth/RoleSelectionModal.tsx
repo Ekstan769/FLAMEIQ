@@ -44,7 +44,6 @@ export default function RoleSelectionModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-[425px]">
-      {/* Heading */}
       <div className="text-center">
         <h2 className="font-heading text-xl font-bold text-ink-500">
           Choose Your Role
@@ -54,8 +53,7 @@ export default function RoleSelectionModal({
         </p>
       </div>
 
-      {/* Role options */}
-      <div className="mt-6 flex flex-col gap-4 w-full">
+      <div className="mt-6 flex w-full flex-col gap-4">
         {ROLE_OPTIONS.map((option) => {
           const isSelected = selectedRole === option.value;
 
@@ -65,13 +63,12 @@ export default function RoleSelectionModal({
               type="button"
               onClick={() => setSelectedRole(option.value)}
               aria-pressed={isSelected}
-              className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition cursor-pointer ${
+              className={`flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left transition ${
                 isSelected
                   ? "border-brand-500 bg-brand-50/60"
                   : "border-border bg-white hover:bg-muted-50"
               }`}
             >
-              {/* Icon */}
               <span
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
                   isSelected
@@ -82,7 +79,6 @@ export default function RoleSelectionModal({
                 {option.icon}
               </span>
 
-              {/* Text */}
               <span className="flex-1">
                 <span className="block text-sm font-semibold text-ink-500">
                   {option.title}
@@ -92,7 +88,6 @@ export default function RoleSelectionModal({
                 </span>
               </span>
 
-              {/* Radio indicator */}
               <span
                 className={`mt-1 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
                   isSelected ? "border-brand-500" : "border-muted-200"
@@ -107,16 +102,14 @@ export default function RoleSelectionModal({
         })}
       </div>
 
-      {/* Continue */}
       <button
         type="button"
         onClick={() => onContinue(selectedRole)}
-        className="mt-6 w-full rounded-lg bg-brand-500 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover cursor-pointer"
+        className="mt-6 w-full cursor-pointer rounded-lg bg-brand-500 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover"
       >
         Continue
       </button>
 
-      {/* Login link */}
       <p className="mt-4 text-center text-sm text-muted-500">
         Already have an account?{" "}
         <Link

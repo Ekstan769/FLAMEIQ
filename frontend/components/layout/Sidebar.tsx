@@ -15,6 +15,7 @@ import {
   DollarSign,
   ClipboardList,
   LogOut,
+  Bot,
   Moon,
   X,
 } from "lucide-react";
@@ -33,7 +34,7 @@ const NAV_ITEMS: Record<Portal, NavItem[]> = {
     { path: "orders", label: "Order Gas", icon: ShoppingCart },
     { path: "track-delivery", label: "Track Order", icon: Truck },
     { path: "smart-refill", label: "Smart Refill", icon: Zap },
-    { path: "wallet", label: "Wallet", icon: Wallet },
+    { path: "ai-assistant", label: "AI Assistant", icon: Bot },
     { path: "vendor-inquiry", label: "Vendor Inquiry", icon: Store },
     { path: "settings", label: "Settings", icon: Settings },
   ],

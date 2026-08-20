@@ -1,9 +1,7 @@
 ﻿"use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Shield,
   Zap,
@@ -12,23 +10,17 @@ import {
   ArrowUpRight,
   Flame,
 } from "lucide-react";
-import RoleSelectionModal from "@/components/auth/RoleSelectionModal";
-import type { Portal } from "@/types/portal";
 
 export default function WelcomePage() {
   const router = useRouter();
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
 
-  const handleContinue = (role: Portal) => {
-    setIsRoleModalOpen(false);
-    router.push(`/signup?role=${role}`);
-  };
+  const handleGetStarted = () => router.push("/terms");
 
   return (
     <main className="min-h-screen bg-white">
       <header className="flex items-center justify-between px-6 py-5 md:px-12">
         <Link href="/" className="text-2xl font-bold text-brand-500">
-          <Image src="/images/logo.png" alt="FlameIQ logo" width={160} height={36} />
+          Flame<span className="text-notify-500">IQ</span>
         </Link>
 
         <div className="flex items-center gap-3">
@@ -41,7 +33,7 @@ export default function WelcomePage() {
 
           <button
             type="button"
-            onClick={() => setIsRoleModalOpen(true)}
+            onClick={handleGetStarted}
             className="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
           >
             Get Started
@@ -63,7 +55,7 @@ export default function WelcomePage() {
           md:grid-cols-2
           md:px-12
           md:py-14
-          bg-[url('/images/Heroflamee.png')]
+          bg-[url('/images/mb-hero-flameiq.png')]
           bg-contain
           bg-bottom
           bg-no-repeat
@@ -76,6 +68,7 @@ export default function WelcomePage() {
             <Flame size={12} className="text-white" />
             Smart Gas Delivery
           </span>
+
           <h1 className="font-heading mt-4 text-4xl font-extrabold leading-tight md:text-5xl">
             <span className="text-ink-500">
               Smart Gas.
@@ -83,8 +76,9 @@ export default function WelcomePage() {
               Delivered Before
               <br />
             </span>
-            <span className="text-[#1f4e79]">You Need It.</span>
+            <span className="text-brand-500">You Need It.</span>
           </h1>
+
           <p className="mt-5 text-[15px] leading-relaxed text-muted-500">
             Monitor your gas level in real time, get smart refill
             predictions, order from trusted vendors and enjoy fast
@@ -94,7 +88,7 @@ export default function WelcomePage() {
           <div className="mt-7 flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => setIsRoleModalOpen(true)}
+              onClick={handleGetStarted}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
             >
               Get Started
@@ -155,12 +149,6 @@ export default function WelcomePage() {
           </div>
         </div>
       </section>
-
-      <RoleSelectionModal
-        isOpen={isRoleModalOpen}
-        onClose={() => setIsRoleModalOpen(false)}
-        onContinue={handleContinue}
-      />
     </main>
   );
 }

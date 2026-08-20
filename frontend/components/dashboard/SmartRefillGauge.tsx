@@ -1,7 +1,26 @@
-import { Sparkles, Fuel, Calendar, ArrowUpRight } from "lucide-react";
+import { Sparkles, Fuel, Calendar, ArrowUpRight,  AlertTriangle } from "lucide-react";
+
+function getGaugeStatus(percent: number) {
+  if (percent >= 60) {
+    return {
+      stroke: "#22C55E",
+      label: "Healthy",
+    };
+  }
+  if (percent >= 40) {
+    return {
+      stroke: "#F4B400",
+      label: "Getting Low",
+    };
+  }
+  return {
+    stroke: "#EF4444",
+    label: "Critical",
+  };
+}
 
 export default function SmartRefillGauge({
-  percent = 35,
+  percent = 40,
   daysLabel = "6 - 8 days",
   dateRange = "12 - 14 August 2026",
 }: {
@@ -12,6 +31,8 @@ export default function SmartRefillGauge({
   const radius = 44;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percent / 100) * circumference;
+  const status = getGaugeStatus(percent);
+  const isCritical = percent < 40;
 
   return (
     <div className="rounded-2xl bg-gradient-to-br from-brand-900 via-brand-700 to-brand-500 p-5 text-white">
@@ -47,7 +68,7 @@ export default function SmartRefillGauge({
                 cy="50"
                 r={radius}
                 fill="none"
-                stroke="#F4B400"
+                stroke={status.stroke}
                 strokeWidth="9"
                 strokeLinecap="round"
                 strokeDasharray={circumference}
@@ -55,7 +76,7 @@ export default function SmartRefillGauge({
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <Fuel size={14} className="mb-0.5 text-notify-400" />
+              <Fuel size={14} className="mb-0.5" style={{ color: status.stroke }} />
               <span className="text-xl font-bold">{percent}%</span>
               <span className="text-[10px] text-white/70">
                 Estimated Gas Left
@@ -83,6 +104,13 @@ export default function SmartRefillGauge({
           </p>
         </div>
       </div>
+
+      {isCritical && (
+        <div className="mt-4 flex items-center gap-2 rounded-lg bg-error/15 px-3 py-2 text-xs font-medium text-white">
+          <AlertTriangle size={14} className="shrink-0 text-error" />
+          Gas is critically low — order a refill now to avoid running out.
+        </div>
+      )}
 
       <div className="mt-4 flex gap-3">
         <button className="flex-1 rounded-lg bg-notify-500 px-4 py-2 text-sm font-semibold text-ink-500 hover:bg-notify-600">
