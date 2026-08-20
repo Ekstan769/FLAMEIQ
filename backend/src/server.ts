@@ -251,13 +251,37 @@ app.delete('/api/auth/me', authenticate, deleteSelf);
  * @swagger
  * /api/users:
  *   get:
- *     summary: Get all users (Admin only)
+ *     summary: Get all users with profiles, pagination, and filtering (Admin only)
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number for pagination.
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Number of users per page (max 100).
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search users by name or email.
+ *       - in: query
+ *         name: profileType
+ *         schema:
+ *           type: string
+ *           enum: [USER, VENDOR, ADMIN]
+ *         description: Filter users by profile type.
  *     responses:
  *       200:
- *         description: A list of users
+ *         description: A paginated list of users with profile data.
  */
 app.get('/api/users', authenticate, authorizeAdmin, getUsers);
 
@@ -274,6 +298,57 @@ app.get('/api/users', authenticate, authorizeAdmin, getUsers);
  *         description: User soft-deleted successfully
  */
 app.delete('/api/users/:id', authenticate, authorizeAdmin, deleteUsers);
+
+/**
+ * @swagger
+ * /api/users/{id}/flag:
+ *   patch:
+ *     summary: Flag a vendor (Admin only). 3 flags auto-deletes the vendor account.
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: The vendor's user ID.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Reason for flagging the vendor.
+ *     responses:
+ *       200:
+ *         description: Vendor flagged successfully. Returns flag count and auto-delete status.
+ *       400:
+ *         description: Invalid request or user is not a vendor.
+ *       404:
+ *         description: Vendor not found.
+ */
+app.patch('/api/users/:id/flag', authenticate, authorizeAdmin, flagVendor);
+
+/**
+ * @swagger
+ * /api/admin/profit:
+ *   get:
+ *     summary: Get total platform profit (Admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Platform total profit calculated from successful payments
+ */
+app.get('/api/admin/profit', authenticate, authorizeAdmin, getTotalProfit);
 
 // NOTE: SSE notification stream is registered below alongside payment routes (authenticated, per-user)
 

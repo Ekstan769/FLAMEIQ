@@ -401,10 +401,10 @@ export const resetPassword = async (req: Request, res: Response) => {
 export const getUsers = async (req: Request, res: Response) => {
     const users = await adminService.getAllUsers();
 
-    // Return a structured, successful JSON response
     return res.status(200).json({
       success: true,
-      data: users
+      data: result.users,
+      pagination: result.pagination,
     });
 };
 
