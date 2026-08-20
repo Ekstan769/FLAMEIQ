@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CreditCard, Landmark, Lock, ArrowRight } from "lucide-react";
 
 type Method = "card" | "bank";
@@ -11,18 +12,23 @@ const OPTIONS: { id: Method; label: string; icon: React.ElementType }[] = [
 ];
 
 export default function PaymentMethod() {
+  const router = useRouter();
   const [selected, setSelected] = useState<Method>("card");
   const [loading, setLoading] = useState(false);
 
   const handleProceed = () => {
-    // TODO: wire to a real payment/checkout service once the backend
-    // endpoint exists. Kept as a UI-only stub for now.
     setLoading(true);
+    if (selected === "card") {
+      router.push("/customer/orders/payment");
+      return;
+    }
+    // Bank transfer has no dedicated screen yet — kept as a UI-only stub
+    // until that flow is designed.
     setTimeout(() => setLoading(false), 800);
   };
 
   return (
-    <div className="max-w-xl">
+    <div className="max-w-xl mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
       <div className="rounded-2xl border border-border bg-card p-6">
         <h2 className="font-heading text-lg font-bold text-ink-500">
           Payment Method
