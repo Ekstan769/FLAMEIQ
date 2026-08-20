@@ -129,6 +129,8 @@ model Profile {
   walletBalance     Decimal     @default(0.00) // In-app wallet balance
   bankCode          String?
   bankAccountNumber String?
+  flagCount         Int         @default(0)
+  flagReason        String?
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   deletedAt         DateTime?
