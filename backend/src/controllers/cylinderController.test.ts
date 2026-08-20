@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mockDeep, mockReset } from 'vitest-mock-extended';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '../generated/prisma/client.js';
 import { Request, Response } from 'express';
 
 import { getCylinders, registerCylinder, deleteCylinder } from './cylinderController.js';
@@ -64,14 +64,14 @@ describe('Cylinder Controller', () => {
 
   describe('registerCylinder', () => {
     it('should register a new cylinder with valid data', async () => {
-      mockReq.body = { size: 'KG_12_5', nickname: 'Kitchen Cylinder' };
+      mockReq.body = { size: 'KG_12', nickname: 'Kitchen Cylinder' };
       const newCylinder = { id: 'cyl-2', userId: 'user-123', ...mockReq.body };
       prismaMock.cylinder.create.mockResolvedValue(newCylinder as any);
 
       await registerCylinder(mockReq, mockRes);
 
       expect(prismaMock.cylinder.create).toHaveBeenCalledWith({
-        data: { userId: 'user-123', size: 'KG_12_5', nickname: 'Kitchen Cylinder', serialNumber: undefined },
+        data: { userId: 'user-123', size: 'KG_12', nickname: 'Kitchen Cylinder', serialNumber: undefined },
       });
       expect(mockRes.status).toHaveBeenCalledWith(201);
       expect(mockRes.json).toHaveBeenCalledWith({ success: true, data: newCylinder });
@@ -81,17 +81,14 @@ describe('Cylinder Controller', () => {
       mockReq.body = { nickname: 'test' };
       await registerCylinder(mockReq, mockRes);
       expect(mockRes.status).toHaveBeenCalledWith(400);
-      expect(mockRes.json).toHaveBeenCalledWith({ success: false, message: 'Cylinder size is required.' });
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ success: false, error: expect.any(Object) }));
     });
 
     it('should return 400 for an invalid cylinder size', async () => {
       mockReq.body = { size: 'KG_99' }; // Use a truly invalid size
       await registerCylinder(mockReq, mockRes);
       expect(mockRes.status).toHaveBeenCalledWith(400);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        success: false,
-        message: 'Invalid cylinder size. Valid sizes are: KG_3, KG_6, KG_12, KG_12_5, KG_25',
-      });
+      expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ success: false, error: expect.any(Object) }));
     });
 
     it('should return 409 if serial number is a duplicate', async () => {

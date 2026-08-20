@@ -56,7 +56,26 @@ This flow describes how an authenticated user places an order.
     *   The user's ID is typically extracted from their JWT on the backend via the `authenticate` middleware.
 
 2.  **Backend Processing (`createOrder` service)**:
-    *   The system calculates the `totalAmount` from the items.
-    *   A new `Order` record and its associated `OrderItem` records are created in the database.
-    *   A real-time notification is sent to the vendor via the `notificationService` (Server-Sent Events).
-    *   The backend responds with a `201 Created` status, returning the newly created order object.
+    *   The system calculates the `totalAmount` from the order items and applies the platform commission rate to determine the `vendorPayoutAmount`.
+    *   A new `Order` record is created in the database with an initial status of `PENDING`. Associated `OrderItem` records are also created.
+    *   A `Transaction` record is created, linked to the order, to track the payment status.
+    *   A `Payout` record is created with a `PENDING` status, detailing the amount owed to the vendor for this order.
+    *   The backend responds with a `201 Created` status, returning the newly created order object. The user is then redirected to the payment gateway.
+
+3.  **Payment Confirmation (Webhook)**:
+    *   After the user completes the payment, the payment gateway (e.g., Flutterwave) sends a webhook event to `/api/payments/webhook`.
+    *   The backend **securely verifies the webhook signature** to ensure it's a legitimate request.
+    *   If the payment was successful (`charge.completed`), the system finds the associated `Order` using the transaction reference.
+    *   The `Order` status is updated from `PAYMENT_PENDING` to `PENDING` (meaning it is paid and awaiting vendor action).
+    *   The corresponding `Transaction` record is updated to `SUCCESS`.
+    *   A real-time notification is sent to the vendor via the `notificationService` (Server-Sent Events) to inform them of the new, paid order.
+    *   The backend responds to the webhook with a `200 OK` status.
+
+4.  **Vendor Accepts Order**:
+    *   The vendor, having received the notification, sends a `POST` request to `/api/orders/:orderId/accept`.
+    *   The backend verifies that the order status is `PENDING`.
+    *   The `Order` status is updated from `PENDING` to `ACCEPTED`.
+    *   A notification is sent to the customer confirming the vendor has accepted their order.
+    *   The backend responds with the updated order object.
+
+This flow ensures that an order is only marked as `ACCEPTED` after both successful payment and explicit vendor confirmation.

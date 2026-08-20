@@ -1,34 +1,44 @@
 import './types/express.d.js';
-
 import express from 'express'
-import cors from 'cors'
 import dotenv from 'dotenv'
+import { corsConfig } from './middleware/corsConfig.js';
+import { config } from './config/index.js';
 import { fileURLToPath } from 'url'
 import multer from 'multer';
 import { notificationService } from './services/notificationService.js'
 import { predictionJob } from './jobs/predictionJob.js';
+import { payoutJob } from './jobs/payoutJob.js';
 import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, forgotPassword, getMe, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
 import { uploadProfilePicture } from './controllers/uploadController.js';
-import { handleFlutterwaveWebhook } from './controllers/paymentController.js';
-import orderRoutes from './routes/orderRoutes.js';
-import cylinderRoutes from './routes/cylinderRoutes.js';
-import reviewRoutes from './routes/reviewRoutes.js';
-import ipTracker from './utils/ipTracker.js'
-import httpLogger from './utils/httpLogger.js'
-import { setupSwagger } from './config/swagger.js'
-
+import { encryptionController } from './controllers/encryptionController.js';
+import orderRoutes from './routesF/orderRoutes.js';
+import paymentRoutes from './routesF/paymentRoutes.js';
+import payoutRoutes from './routesF/payoutRoutes.js';
+import cylinderRoutes from './routesF/cylinderRoutes.js';
+import reviewRoutes from './routesF/reviewRoutes.js';
+//import predictionRoutes from './routes/predictionRoutes.js';
+import createRoutesRouter from './routesF/routes.js';
+import ipTracker from './utils/ipTracker.js';
+import httpLogger from './utils/httpLogger.js';
+import { setupSwagger } from './config/swagger.js';
+import { generalLimiter, authLimiter } from './middleware/rateLimiter.js';
+import { errorHandler } from './middleware/errorHandler.js';
+// dotenv.config() is now handled by src/config/index.ts
 dotenv.config()
 
+
 const app = express()
-app.use(cors())
+
+app.use(corsConfig)
 app.use(express.json())
+
+app.use(ipTracker)
+app.use(httpLogger)
+app.use(generalLimiter);
 
 // Multer setup for in-memory file storage
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-
-app.use(ipTracker)
-app.use(httpLogger)
 
 setupSwagger(app)
 
@@ -59,7 +69,7 @@ app.get('/', (req, res) => {
  *       201:
  *         description: User created successfully
  */
-app.post('/api/auth/signup', signUp)
+app.post('/api/auth/signup', authLimiter, signUp)
 
 /**
  * @swagger
@@ -82,7 +92,7 @@ app.post('/api/auth/signup', signUp)
  *       200:
  *         description: Account verified successfully, returns JWT
  */
-app.post('/api/auth/verify-otp', verifyOtp);
+app.post('/api/auth/verify-otp', authLimiter, verifyOtp);
 
 
 /**
@@ -108,8 +118,8 @@ app.post('/api/auth/verify-otp', verifyOtp);
  *       401:
  *         description: Invalid email or password
  */
-app.post('/api/auth/signin', signIn)
-app.post('/api/auth/login', signIn)
+app.post('/api/auth/signin', authLimiter, signIn)
+app.post('/api/auth/login', authLimiter, signIn)
 
 /**
  * @swagger
@@ -130,7 +140,7 @@ app.post('/api/auth/login', signIn)
  *       200:
  *         description: A confirmation message is sent
  */
-app.post('/api/auth/forgot-password', forgotPassword);
+app.post('/api/auth/forgot-password', authLimiter, forgotPassword);
 
 /**
  * @swagger
@@ -155,7 +165,7 @@ app.post('/api/auth/forgot-password', forgotPassword);
  *       200:
  *         description: Password has been reset successfully
  */
-app.post('/api/auth/reset-password', resetPassword);
+app.post('/api/auth/reset-password', authLimiter, resetPassword);
 
 /**
  * @swagger
@@ -265,49 +275,7 @@ app.get('/api/users', authenticate, authorizeAdmin, getUsers);
  */
 app.delete('/api/users/:id', authenticate, authorizeAdmin, deleteUsers);
 
-// --- Server-Sent Events (SSE) Endpoint for Pop-up Notifications ---
-/**
- * @swagger
- * /api/notifications/stream:
- *   get:
- *     summary: Establishes a Server-Sent Events (SSE) connection for real-time notifications.
- *     tags: [Notifications]
- *     parameters:
- *       - in: query
- *         name: clientId
- *         schema:
- *           type: string
- *         required: true
- *         description: A unique identifier for the client establishing the connection.
- *     responses:
- *       200:
- *         description: SSE connection established. Events will be streamed.
- *         content:
- *           text/event-stream:
- *             schema:
- *               type: string
- *               example: "data: {\"title\":\"New Order Received\",\"message\":\"You have a new standard order! Total: $120.00\",\"type\":\"info\",\"timestamp\":\"2023-10-27T10:00:00.000Z\"}\n\n"
- *       400:
- *         description: clientId is required.
- */
-app.get('/api/notifications/stream', (req, res) => {
-  const clientId = req.query.clientId as string;
-  if (!clientId) {
-    return res.status(400).json({ error: 'clientId is required' });
-  }
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  // Flush headers immediately
-  res.flushHeaders();
-
-  // Keep connection alive
-  res.write(': keep-alive\n\n');
-
-  notificationService.addClient(res);
-});
+// NOTE: SSE notification stream is registered below alongside payment routes (authenticated, per-user)
 
 // --- Order Routes ---
 /**
@@ -645,21 +613,26 @@ app.use('/api/cylinders', cylinderRoutes);
  */
 app.use('/api/reviews', reviewRoutes);
 
-// --- Payment Webhook Route ---
+// --- Prediction Routes ---
 /**
  * @swagger
  * tags:
- *   name: Payments
- *   description: API for handling payment gateway webhooks
+ *   name: Predictions
+ *   description: API for managing gas refill predictions
  */
 
 /**
  * @swagger
- * /api/payments/webhook:
+ * /api/predictions/initial:
  *   post:
- *     summary: Handles payment confirmation webhooks from Flutterwave
- *     tags: [Payments]
- *     description: This endpoint receives webhook events from Flutterwave to confirm payment status. It should not be called directly by a client.
+ *     summary: Generate the first (cold-start) prediction for a user
+ *     tags: [Predictions]
+ *     description: >
+ *       This endpoint is typically called automatically after a user registers their first cylinder
+ *       and has provided their household profile information. It generates a "cold-start" prediction
+ *       and saves it.
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -667,20 +640,108 @@ app.use('/api/reviews', reviewRoutes);
  *           schema:
  *             type: object
  *             properties:
- *               event:
+ *               cylinderId:
  *                 type: string
- *                 example: charge.completed
- *               data:
- *                 type: object
+ *                 description: The ID of the user's first registered cylinder.
+ *     responses:
+ *       202:
+ *         description: Prediction generation has been accepted and is processing in the background.
+ */
+//app.use('/api/predictions', predictionRoutes);
+
+// --- Payout Routes ---
+/**
+ * @swagger
+ * tags:
+ *   name: Payouts
+ *   description: API for vendors to view their payout history
+ */
+app.use('/api/payouts', payoutRoutes);
+// --- Payment Routes (initiate, verify, wallet, webhook) ---
+app.use('/api/payments', paymentRoutes);
+
+// --- Encryption Route ---
+/**
+ * @swagger
+ * /api/encrypt:
+ *   post:
+ *     summary: Encrypt a payload for the payment gateway
+ *     tags: [Utility]
+ *     description: >
+ *       Encrypts a string payload using the payment gateway's public key.
+ *       **WARNING**: For PCI compliance, sensitive card data (PAN, CVV) should be
+ *       encrypted on the client-side, not sent to the server for encryption. This
+ *       endpoint receives the payload in plaintext.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               payload:
+ *                 type: string
  *     responses:
  *       200:
- *         description: Webhook received and acknowledged.
- *       401:
- *         description: Invalid webhook signature.
+ *         description: Payload encrypted successfully.
  */
-app.post('/api/payments/webhook', handleFlutterwaveWebhook);
+app.post('/api/encrypt', encryptionController.encryptPayload);
 
-const PORT = process.env.PORT || 4000
+// --- Real-time Notifications (Server-Sent Events) ---
+// GET /api/notifications/stream — authenticated users subscribe to their own event stream
+app.get('/api/notifications/stream', authenticate, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable Nginx buffering
+  res.flushHeaders();
+
+  const userId = req.user!.id;
+  notificationService.addClient(res, userId);
+
+  // Send a heartbeat every 30s to keep the connection alive
+  const heartbeat = setInterval(() => {
+    res.write(': heartbeat\n\n');
+  }, 30000);
+
+  res.on('close', () => clearInterval(heartbeat));
+});
+
+// GET /api/notifications — fetch persisted notifications for the user
+app.get('/api/notifications', authenticate, async (req, res) => {
+  try {
+    const { prisma } = await import('./db/prisma.js');
+    const userId = req.user!.id;
+    const notifications = await prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    return res.json({ success: true, data: notifications });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Failed to fetch notifications.' });
+  }
+});
+
+// PATCH /api/notifications/:id/read — mark a notification as read
+app.patch('/api/notifications/:id/read', authenticate, async (req, res) => {
+  try {
+    const { prisma } = await import('./db/prisma.js');
+    const { id } = req.params;
+    await prisma.notification.update({ where: { id }, data: { isRead: true } });
+    return res.json({ success: true });
+  } catch {
+    return res.status(500).json({ success: false, message: 'Failed to mark notification as read.' });
+  }
+});
+
+// --- Developer Route Listing (must be last to see all routes) ---
+app.use('/routes', createRoutesRouter(app));
+
+// --- Global Error Handler (must be the last middleware) ---
+app.use(errorHandler);
+
+const PORT = config.port;
 
 const isDirectRun =
   !process.argv[1] ||
@@ -690,12 +751,14 @@ const isDirectRun =
 
 if (isDirectRun) {
   // Initialize background jobs
-  predictionJob.start();
+  if (config.enablePredictionJob) predictionJob.start();
+  if (config.enablePayoutJob) payoutJob.start(); // Start the new payout job
 
-  app.listen(PORT, () => {
-    // eslint-disable-next-line no-console
-    console.log(`Server running on http://localhost:${PORT}`)
-  })
+  setTimeout(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`)
+    })
+  }, 0);
 }
 
 export default app

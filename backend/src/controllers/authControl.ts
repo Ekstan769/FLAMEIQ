@@ -3,26 +3,29 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/db/prisma.js";
 import * as adminService from '@/services/adminService.js'
-import { logger } from '@/utils/logger.js';
+import { logger } from '@/utils/logger.js'; //import { UnauthorizedError, AppError } from '@/utils/errors.js';
 //import { UnauthorizedError, AppError } from '@/utils/errors.js';
 import { generateOtp, getOtpExpiration, hashOtp } from "@/utils/otp.js";
 import { emailService } from "../services/emailService.js";
 //import { uploadToCloudinary } from "../utils/upload";
+import { config } from '../config/index.js';
+import { signupSchema, loginSchema, verifyOtpSchema } from "../validators/authValidators.js";
 
+import { AppError, UnauthorizedError } from "@/utils/errors.js";
 
 
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
 
   if (!header?.startsWith("Bearer ")) {
-    return res.status(401).json({ success: false, message: "Authentication required" });
+    return next(new UnauthorizedError("Authentication required. No token provided."));
   }
 
   const token = header.substring(7);
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
-      id: number;
+      id: string;
       role: string;
     };
 
@@ -34,16 +37,13 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
     return next();
   } catch (error) {
     logger.error({ err: error }, "Invalid or expired auth token");
-    return res.status(401).json({ success: false, message: "Invalid or expired token" });
+    return next(new UnauthorizedError("Invalid or expired token."));
   }
 };
 
 export const authorizeAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (req.user?.role !== 'ADMIN') {
-    return res.status(403).json({
-      success: false,
-      message: "Forbidden: Administrator access required.",
-    });
+    throw new AppError("Forbidden: Administrator access required.", 403);
   }
   return next();
 };
@@ -52,47 +52,37 @@ export const authorizeVendor = async (req: Request, res: Response, next: NextFun
   const userId = req.user?.id;
 
   if (!userId) {
-    // This should technically be caught by `authenticate` first
-    return res.status(401).json({ success: false, message: "Authentication required." });
+    throw new UnauthorizedError("Authentication required.");
   }
 
   // Admins can also perform vendor actions
   if (req.user!.role === 'ADMIN') {
     return next();
   }
-
-  try {
-    const profile = await prisma.profile.findUnique({ where: { userId } });
-    if (profile?.profileType === 'VENDOR') {
-      return next();
-    }
-    return res.status(403).json({ success: false, message: "Forbidden: Vendor access required." });
-  } catch (error) {
-    logger.error({ err: error, userId }, "Vendor authorization check failed");
-    return res.status(500).json({ success: false, message: "An unexpected error occurred during authorization." });
+  const profile = await prisma.profile.findUnique({ where: { userId } });
+  if (profile?.profileType === 'VENDOR') {
+    return next();
   }
+  throw new AppError("Forbidden: Vendor access required.", 403);
 };
 
 
 export const signUp = async(req: Request, res: Response) => {
-    const{name, email, password} = req.body // stores input from body
-    try{
-        if(!name||!email||!password)
-            /*if no first name or no last name or no email or no password run the next code:-*/
-        {
-            return res.status(400).json({message:"All fields required"});
-        }
-
-     // 1. Check if the user already exists
-     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() }, // Normalizing email to lowercase is highly recommended
+    const result = signupSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.flatten().fieldErrors });
+    }
+    const { name, email, password } = result.data;
+    // Checks if the user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() }, // Normalizing email to lowercase is best
     });
 
     if (existingUser) {
-      return res.status(409).json({ message: "User already exists" });
+      throw new AppError("User with this email already exists.", 409);
     }
 
-    // 2. Hash your password here before inserting (e.g., using bcrypt)
+    // Hash your password here before inserting (e.g., using bcrypt)
 
         const hashedPassword = await bcrypt.hash(password, 10); //call bcrypt to hash password and save hashed password
 
@@ -139,32 +129,68 @@ export const signUp = async(req: Request, res: Response) => {
           message: "User created successfully. Please check your email for the verification code.",
           userId: user.id,
         });
-    } catch (error: any) {
-        console.error("SignUp Error Stack:", error?.stack || error);
-        logger.error({ message: error?.message, stack: error?.stack }, "Sign-up process failed unexpectedly");
-
-        return res.status(500).json({
-          success: false,
-          message: "Unexpected error sign up failed."
-        });
-    }
 }
+export const resendOtp = async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: "Email is required." });
+  }
+
+    const normalizedEmail = String(email).toLowerCase();
+
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail, deletedAt: null },
+    });
+
+    if (!user) {
+      throw new AppError("User not found.", 404);
+    }
+    const otp = generateOtp();
+    const otpExpiresAt = getOtpExpiration();
+    const codeHash = await hashOtp(otp);
+
+    await prisma.otpVerification.updateMany({
+      where: { userId: user.id, purpose: "REGISTRATION", usedAt: null },
+      data: {
+        codeHash,
+        expiresAt: otpExpiresAt,
+        purpose: "REGISTRATION",
+      },
+    });
+    await emailService.sendEmail(
+      normalizedEmail,
+      "Your FLAMEIQ Verification Code",
+      `Welcome to FLAMEIQ! Your verification code is: ${otp}. It will expire in 10 minutes.`,
+      `<p>Welcome to FLAMEIQ! Your verification code is: <strong>${otp}</strong>. It will expire in 10 minutes.</p>`
+      );
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification code resent successfully.",
+    });
+};
 
 export const verifyOtp = async (req: Request, res: Response) => {
-  const { userId, otp } = req.body;
+  const result = verifyOtpSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error.flatten().fieldErrors });
+  }
+  const { email, otp } = result.data;
+    // Find the user by email first
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase(), deletedAt: null },
+      select: { id: true },
+    });
 
-  try {
-    if (!userId || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: "User ID and OTP are required.",
-      });
+    if (!user) {
+      throw new AppError("User not found.", 404);
     }
 
     // Find the latest valid OTP for the user and purpose
     const otpRecord = await prisma.otpVerification.findFirst({
       where: {
-        userId: userId,
+        userId: user.id,
         purpose: "REGISTRATION",
         usedAt: null, // Not yet used
         expiresAt: {
@@ -177,19 +203,13 @@ export const verifyOtp = async (req: Request, res: Response) => {
     });
 
     if (!otpRecord) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid OTP.",
-      });
+      throw new UnauthorizedError("Invalid or expired OTP.");
     }
 
     // Compare the provided OTP with the stored hash
     const isOtpValid = await bcrypt.compare(otp, otpRecord.codeHash);
     if (!isOtpValid) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid OTP.",
-      });
+      throw new UnauthorizedError("Invalid OTP.");
     }
 
     // OTP is valid, clear it and generate JWT
@@ -201,8 +221,8 @@ export const verifyOtp = async (req: Request, res: Response) => {
     });
 
     // Fetch the user to return with the token
-    const user = await prisma.user.findUnique({
-      where: { id: userId, deletedAt: null },
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id, deletedAt: null },
       select: {
         id: true,
         name: true,
@@ -212,33 +232,26 @@ export const verifyOtp = async (req: Request, res: Response) => {
       },
     });
 
-    if (!user) { // Should not happen if otpRecord was found, but for type safety
-      return res.status(404).json({ success: false, message: "User not found after OTP verification." });
+    if (!fullUser) { // Should not happen if user was found initially
+      throw new AppError("User not found after OTP verification.", 404);
     }
 
     const payload = {
-      id: user.id, email: user.email, role: user.role,
+      id: fullUser.id, email: fullUser.email, role: fullUser.role,
     };
-    const secret = process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026";
-    const token = jwt.sign(payload, secret, { expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any });
+    const secret = config.jwtSecret;
+    const token = jwt.sign(payload, secret, { expiresIn: config.jwtExpiresIn as any });
 
-    return res.status(200).json({ success: true, message: "Account verified successfully.", token, user });
-  } catch (error) {
-    logger.error({ err: error }, "OTP verification failed unexpectedly");
-    return res.status(500).json({ success: false, message: "An unexpected error occurred during OTP verification." });
-  }
+    return res.status(200).json({ success: true, message: "Account verified successfully.", token, user: fullUser });
 };
 
 
 export const signIn = async (req: Request, res: Response) =>{
-  const {email, password}= req.body;
-  try{
-    if (!email||!password){
-      return res.status(400).json({
-        success: false,
-        message: "email and password required"
-      });
+  const result = loginSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.flatten().fieldErrors });
     }
+    const { email, password } = result.data;
     const normalizedEmail = email.toLowerCase();
     const user = await prisma.user.findFirst({
       where: {
@@ -249,19 +262,14 @@ export const signIn = async (req: Request, res: Response) =>{
     });
 
     if(!user){
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password"
-      });
+      throw new UnauthorizedError("Invalid email or password");
     }
     const PasswordValid = await bcrypt.compare(password, user.password);
     if(!PasswordValid){
       logger.warn(`Failed login attempt for email ${email} from IP ${req.ip}`);
       logger.warn(`Failed login attempt for email ${normalizedEmail} from IP ${(req as any).clientIp || req.ip}`);
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password"
-      });
+      
+      throw new UnauthorizedError("Invalid email or password");
     }
 
     const clientIp = (req as any).clientIp || req.ip || '0.0.0.0';
@@ -308,12 +316,12 @@ const payload = {
 };
 
 // 2. Pass the clean payload and cast the options
-const secret = process.env.JWT_SECRET || "flameiq_secret_jwt_key_2026";
+const secret = config.jwtSecret;
 const token = jwt.sign(
   payload,
   secret,
   {
-    expiresIn: (process.env.JWT_EXPIRES_IN || "1d") as any
+    expiresIn: config.jwtExpiresIn as any
   }
 );
 
@@ -330,16 +338,6 @@ const token = jwt.sign(
         profile: user.profile,
       },
     });
-  } catch (error){
-    logger.error({err: error}, "#panic sign in process failed");
-
-  
-    return res.status(500).json({
-      success: false,
-      message: "unexpected server error"
-    });
-
-  }
 };
 
 export const forgotPassword = async (req: Request, res: Response) => {
@@ -349,7 +347,6 @@ export const forgotPassword = async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, message: "Email is required." });
   }
 
-  try {
     const normalizedEmail = String(email).toLowerCase();
     const user = await prisma.user.findFirst({
       where: { email: normalizedEmail, deletedAt: null },
@@ -383,10 +380,6 @@ export const forgotPassword = async (req: Request, res: Response) => {
       success: true,
       message: "If an account with that email exists, a password reset code has been sent.",
     });
-  } catch (error) {
-    logger.error({ err: error }, "Forgot password process failed");
-    return res.status(500).json({ success: false, message: "An unexpected error occurred." });
-  }
 };
 
 export const resetPassword = async (req: Request, res: Response) => {
@@ -396,7 +389,6 @@ export const resetPassword = async (req: Request, res: Response) => {
     return res.status(400).json({ success: false, message: "Email, OTP, and new password are required." });
   }
 
-  try {
     const normalizedEmail = String(email).toLowerCase();
     const otpRecord = await prisma.otpVerification.findFirst({
       where: {
@@ -409,7 +401,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     });
 
     if (!otpRecord || !(await bcrypt.compare(otp, otpRecord.codeHash))) {
-      return res.status(401).json({ success: false, message: "Invalid or expired OTP." });
+      throw new UnauthorizedError("Invalid or expired OTP.");
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -422,15 +414,10 @@ export const resetPassword = async (req: Request, res: Response) => {
     await prisma.otpVerification.update({ where: { id: otpRecord.id }, data: { usedAt: new Date() } });
 
     return res.status(200).json({ success: true, message: "Password has been reset successfully." });
-  } catch (error) {
-    logger.error({ err: error }, "Reset password process failed");
-    return res.status(500).json({ success: false, message: "An unexpected error occurred." });
-  }
 };
 
 //get all users to be used by admin
 export const getUsers = async (req: Request, res: Response) => {
-  try {
     const users = await adminService.getAllUsers();
 
     // Return a structured, successful JSON response
@@ -438,32 +425,21 @@ export const getUsers = async (req: Request, res: Response) => {
       success: true,
       data: users
     });
-  } catch (error) {
-    // The service already logged the full trace, so just sending the user response here
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch users"
-    });
-  }
 };
 
-export const deleteUsers = async (req: Request, res: Response) => {
-  // The service function handles the response, so no try/catch is needed here.
+export const deleteUsers = (req: Request, res: Response) => {
   return adminService.adminDeleteUser(req, res);
 };
 
-export const deleteSelf = async (req: Request, res: Response) => {
-  // The service function handles the response.
+export const deleteSelf = (req: Request, res: Response) => {
   return adminService.selfDeleteUser(req, res);
 };
 export const updateProfile = async (req: Request, res: Response) => {
-  try {
-    if (!req.user?.id) {
-      return res.status(401).json({ success: false, message: "Unauthorized access." });
-    }
-
+  if (!req.user?.id) {
+    throw new UnauthorizedError("Unauthorized access.");
+  }
     const userId = req.user.id;
-    const { businessName, phone, address, isVendor, profilePic } = req.body;
+    const { businessName, phone, address, isVendor, profilePic, bankCode, bankAccountNumber } = req.body;
 
     const existingProfile = await prisma.profile.findUnique({
       where: { userId },
@@ -480,6 +456,8 @@ export const updateProfile = async (req: Request, res: Response) => {
         ...(phone !== undefined ? { phone: phone ? String(phone) : null } : {}),
         ...(address !== undefined ? { address: address ? String(address) : null } : {}),
         ...(profilePic !== undefined ? { profilePic: profilePic ? String(profilePic) : null } : {}),
+        ...(bankCode !== undefined ? { bankCode: bankCode ? String(bankCode) : null } : {}),
+        ...(bankAccountNumber !== undefined ? { bankAccountNumber: bankAccountNumber ? String(bankAccountNumber) : null } : {}),
         deletedAt: null,
       },
       create: {
@@ -489,6 +467,8 @@ export const updateProfile = async (req: Request, res: Response) => {
         phone: phone ? String(phone) : null,
         address: address ? String(address) : null,
         profilePic: profilePic ? String(profilePic) : null,
+        bankCode: bankCode ? String(bankCode) : null,
+        bankAccountNumber: bankAccountNumber ? String(bankAccountNumber) : null,
       },
     });
 
@@ -497,18 +477,12 @@ export const updateProfile = async (req: Request, res: Response) => {
       message: "Profile updated successfully",
       profile,
     });
-  } catch (error) {
-    logger.error({ err: error }, "Profile update failed");
-    return res.status(500).json({ success: false, message: "Failed to update profile" });
-  }
 };
 
 export const getMe = async (req: Request, res: Response) => {
-  try {
-    if (!req.user?.id) {
-      return res.status(401).json({ success: false, message: "Unauthorized access." });
-    }
-
+  if (!req.user?.id) {
+    throw new UnauthorizedError("Unauthorized access.");
+  }
     const userId = req.user.id;
 
     const user = await prisma.user.findUnique({
@@ -526,8 +500,4 @@ export const getMe = async (req: Request, res: Response) => {
     });
 
     return res.status(200).json({ success: true, data: user });
-  } catch (error) {
-    logger.error({ err: error }, "Failed to fetch user profile");
-    return res.status(500).json({ success: false, message: "Failed to fetch user profile." });
-  }
 };
