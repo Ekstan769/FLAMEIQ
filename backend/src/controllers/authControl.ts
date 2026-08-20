@@ -13,31 +13,47 @@ import { signupSchema, loginSchema, verifyOtpSchema } from "../validators/authVa
 
 import { AppError, UnauthorizedError } from "@/utils/errors.js";
 
+// Define a type for our JWT payload for better type safety
+interface JwtPayload {
+  id: string;
+  email: string;
+  role: 'USER' | 'ADMIN'; // Use a specific enum or union type if available
+}
 
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
 
   if (!header?.startsWith("Bearer ")) {
+    return next(new UnauthorizedError("Authentication required. No token provided or token is malformed."));
+  }
+
+  const token = header.split(' ')[1];
+  if (!token) {
     return next(new UnauthorizedError("Authentication required. No token provided."));
   }
 
-  const token = header.substring(7);
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
-      id: string;
-      role: string;
-    };
+    // Use the centralized config for the JWT secret
+    const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+
+    // Basic validation of the decoded payload's shape
+    if (typeof decoded !== 'object' || !decoded.id || !decoded.role) {
+      throw new Error('Invalid token payload');
+    }
 
     req.user = {
       id: decoded.id,
-      role: decoded.role as any,
-    } as any;
+      role: decoded.role,
+    };
 
     return next();
   } catch (error) {
-    logger.error({ err: error }, "Invalid or expired auth token");
-    return next(new UnauthorizedError("Invalid or expired token."));
+    logger.warn({ err: error }, "Invalid or expired auth token provided");
+    // Provide a clear error for expired tokens, which is a common case
+    if (error instanceof jwt.TokenExpiredError) {
+      return next(new UnauthorizedError("Your session has expired. Please sign in again."));
+    }
+    return next(new UnauthorizedError("Invalid or expired token. Please sign in again."));
   }
 };
 
@@ -275,62 +291,27 @@ export const signIn = async (req: Request, res: Response) =>{
     const clientIp = (req as any).clientIp || req.ip || '0.0.0.0';
     const userAgent = req.headers['user-agent'] || 'unknown';
     await prisma.loginHistory.create({
-
+      data: {
+        userId: user.id,
+        ipAddress: clientIp,
+        userAgent: userAgent,
+      },
+    });
+    
     const payload = {
       id: user.id,
       email: user.email,
       role: user.role,
     };
 
-    const secret = process.env.JWT_SECRET || '';
-    const token = jwt.sign(payload, secret, { expiresIn: process.env.JWT_EXPIRES_IN || "1d" });
-
-
-    return res.status(200).json({
-      success: true,
-      message: "Sign-in completed",
-      token,
-      user:{
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        profile: user.profile,
-      },
-    });
-    await prisma.otpVerification.update({ where: { id: otpRecord.id }, data: { usedAt: new Date() } });
-
-<<<<<<< HEAD
-    return res.status(200).json({ success: true, message: 'Password reset successful.' });
-  } catch (error) {
-    logger.error({ err: error }, 'Reset password failed');
-    return res.status(500).json({ success: false, message: 'Failed to reset password.' });
-  }
-=======
-
-const payload = {
-  id: user.id,
-  email: user.email,
-  role: user.role,
->>>>>>> 752a3730cdc96e0a8bbca82437808ae83c3c68d9
-};
-
-// 2. Pass the clean payload and cast the options
-const secret = config.jwtSecret;
-const token = jwt.sign(
-  payload,
-  secret,
-  {
-    expiresIn: config.jwtExpiresIn as any
-  }
-);
-
+    const secret = config.jwtSecret;
+    const token = jwt.sign(payload, secret, { expiresIn: config.jwtExpiresIn as any });
 
     return res.status(200).json({
       success: true,
       message: "Sign-in completed",
       token,
-      user:{
+      user: {
         id: user.id,
         name: user.name,
         email: user.email,
@@ -434,10 +415,42 @@ export const deleteUsers = (req: Request, res: Response) => {
 export const deleteSelf = (req: Request, res: Response) => {
   return adminService.selfDeleteUser(req, res);
 };
+
+export const getMe = async (req: Request, res: Response) => {
+  if (!req.user?.id) {
+    // This should be caught by the `authenticate` middleware, but it's a good safeguard.
+    throw new UnauthorizedError("Unauthorized access. No user authenticated.");
+  }
+
+  const userId = req.user.id;
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+      deletedAt: null, // Ensure the user has not been soft-deleted
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      profile: true, // Include the user's profile information
+    },
+  });
+
+  if (!user) {
+    throw new AppError("Authenticated user not found.", 404);
+  }
+
+  return res.status(200).json({ success: true, data: user });
+};
+
 export const updateProfile = async (req: Request, res: Response) => {
   if (!req.user?.id) {
     throw new UnauthorizedError("Unauthorized access.");
   }
+
+  try {
     const userId = req.user.id;
     const { businessName, phone, address, isVendor, profilePic, bankCode, bankAccountNumber } = req.body;
 
@@ -474,30 +487,11 @@ export const updateProfile = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      message: "Profile updated successfully",
+      message: 'Profile updated successfully',
       profile,
     });
-};
-
-export const getMe = async (req: Request, res: Response) => {
-  if (!req.user?.id) {
-    throw new UnauthorizedError("Unauthorized access.");
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to update profile');
+    return res.status(500).json({ success: false, message: 'Failed to update profile' });
   }
-    const userId = req.user.id;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId, deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        profile: true,
-        cylinders: true,
-        orders: { orderBy: { createdAt: 'desc' } },
-      },
-    });
-
-    return res.status(200).json({ success: true, data: user });
 };
