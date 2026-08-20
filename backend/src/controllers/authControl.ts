@@ -13,31 +13,47 @@ import { signupSchema, loginSchema, verifyOtpSchema } from "../validators/authVa
 
 import { AppError, UnauthorizedError } from "@/utils/errors.js";
 
+// Define a type for our JWT payload for better type safety
+interface JwtPayload {
+  id: string;
+  email: string;
+  role: 'USER' | 'ADMIN'; // Use a specific enum or union type if available
+}
 
 export const authenticate = (req: Request, res: Response, next: NextFunction) => {
   const header = req.headers.authorization;
 
   if (!header?.startsWith("Bearer ")) {
+    return next(new UnauthorizedError("Authentication required. No token provided or token is malformed."));
+  }
+
+  const token = header.split(' ')[1];
+  if (!token) {
     return next(new UnauthorizedError("Authentication required. No token provided."));
   }
 
-  const token = header.substring(7);
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
-      id: string;
-      role: string;
-    };
+    // Use the centralized config for the JWT secret
+    const decoded = jwt.verify(token, config.jwtSecret) as JwtPayload;
+
+    // Basic validation of the decoded payload's shape
+    if (typeof decoded !== 'object' || !decoded.id || !decoded.role) {
+      throw new Error('Invalid token payload');
+    }
 
     req.user = {
       id: decoded.id,
-      role: decoded.role as any,
-    } as any;
+      role: decoded.role,
+    };
 
     return next();
   } catch (error) {
-    logger.error({ err: error }, "Invalid or expired auth token");
-    return next(new UnauthorizedError("Invalid or expired token."));
+    logger.warn({ err: error }, "Invalid or expired auth token provided");
+    // Provide a clear error for expired tokens, which is a common case
+    if (error instanceof jwt.TokenExpiredError) {
+      return next(new UnauthorizedError("Your session has expired. Please sign in again."));
+    }
+    return next(new UnauthorizedError("Invalid or expired token. Please sign in again."));
   }
 };
 
