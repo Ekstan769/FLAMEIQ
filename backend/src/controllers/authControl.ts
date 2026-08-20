@@ -456,8 +456,25 @@ export const flagVendor = async (req: Request, res: Response) => {
 };
 
 export const deleteUsers = async (req: Request, res: Response) => {
-  // The service function handles the response, so no try/catch is needed here.
-  return adminService.adminDeleteUser(req, res);
+  try {
+    const { id: targetUserId } = req.params;
+    const adminId = req.user!.id;
+
+    const result = await adminService.adminDeleteUser(targetUserId, adminId);
+
+    if ('error' in result) {
+      return res.status(result.status as number).json({ success: false, message: result.error });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result.deletedUser,
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Error deleting user');
+    return res.status(500).json({ success: false, message: 'An unexpected server error occurred.' });
+  }
 };
 
 export const deleteSelf = async (req: Request, res: Response) => {

@@ -151,36 +151,51 @@ export const flagVendor = async (vendorId: string, reason: string) => {
   }
 };
 
-export const adminDeleteUser = async (req: Request, res: Response): Promise<Response> => {
-  const { id: targetUserId } = req.params;
-
-  if (!req.user?.id) {
-    return res.status(401).json({ success: false, message: "Unauthorized access." });
-  }
-
-  // Security: Ensure the user performing the action is an admin.
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, message: "Forbidden: You do not have permission to perform this action." });
-  }
-
-  if (targetUserId === req.user.id) {
-    return res.status(400).json({ success: false, message: "You cannot delete your own account through this endpoint." });
-  }
-
+/**
+ * Admin soft-deletes a user and cascades the deletion to their Profile.
+ * Returns the deleted user's basic info for confirmation.
+ */
+export const adminDeleteUser = async (targetUserId: string, adminId: string) => {
   try {
-    const result = await prisma.user.updateMany({
+    // Verify the target user exists and is not already deleted
+    const targetUser = await prisma.user.findUnique({
       where: { id: targetUserId, deletedAt: null },
-      data: { deletedAt: new Date() },
+      select: { id: true, name: true, email: true, role: true },
     });
 
-    if (result.count === 0) {
-      return res.status(404).json({ success: false, message: "User not found or already deleted." });
+    if (!targetUser) {
+      return { error: 'User not found or already deleted.', status: 404 };
     }
 
-    return res.status(200).json({ success: true, message: `User account (ID: ${targetUserId}) has been soft-deleted by Admin.` });
+    if (targetUserId === adminId) {
+      return { error: 'You cannot delete your own account through this endpoint.', status: 400 };
+    }
+
+    const now = new Date();
+
+    // Soft-delete user and cascade to profile in a transaction
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: targetUserId },
+        data: { deletedAt: now },
+      });
+
+      // Cascade soft-delete to the profile (if it exists)
+      await tx.profile.updateMany({
+        where: { userId: targetUserId, deletedAt: null },
+        data: { deletedAt: now },
+      });
+    });
+
+    logger.info(`Admin ${adminId} soft-deleted user ${targetUserId} (${targetUser.email})`);
+
+    return {
+      message: `User account "${targetUser.name}" (${targetUser.email}) has been deleted.`,
+      deletedUser: targetUser,
+    };
   } catch (error) {
-    logger.error({ err: error }, `Admin delete failed for target user ID: ${targetUserId} by Admin ID: ${req.user.id}`);
-    return res.status(500).json({ success: false, message: "An unexpected server error occurred." });
+    logger.error({ err: error }, `Admin delete failed for target user ID: ${targetUserId} by Admin ID: ${adminId}`);
+    throw error;
   }
 };
 
