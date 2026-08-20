@@ -1,34 +1,44 @@
 import './types/express.d.js';
-
 import express from 'express'
-import cors from 'cors'
 import dotenv from 'dotenv'
+import { corsConfig } from './middleware/corsConfig.js';
+import { config } from './config/index.js';
 import { fileURLToPath } from 'url'
 import multer from 'multer';
 import { notificationService } from './services/notificationService.js'
 import { predictionJob } from './jobs/predictionJob.js';
-import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, flagVendor, forgotPassword, getMe, getTotalProfit, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
+import { payoutJob } from './jobs/payoutJob.js';
+import { authenticate, authorizeAdmin, deleteSelf, deleteUsers, forgotPassword, getMe, getUsers, resetPassword, signIn, signUp, updateProfile, verifyOtp } from './controllers/authControl.js';
 import { uploadProfilePicture } from './controllers/uploadController.js';
-import orderRoutes from './routes/orderRoutes.js';
-import paymentRoutes from './routes/paymentRoutes.js';
-import cylinderRoutes from './routes/cylinderRoutes.js';
-import reviewRoutes from './routes/reviewRoutes.js';
-import ipTracker from './utils/ipTracker.js'
-import httpLogger from './utils/httpLogger.js'
-import { setupSwagger } from './config/swagger.js'
-
+import { encryptionController } from './controllers/encryptionController.js';
+import orderRoutes from './routesF/orderRoutes.js';
+import paymentRoutes from './routesF/paymentRoutes.js';
+import payoutRoutes from './routesF/payoutRoutes.js';
+import cylinderRoutes from './routesF/cylinderRoutes.js';
+import reviewRoutes from './routesF/reviewRoutes.js';
+//import predictionRoutes from './routes/predictionRoutes.js';
+import createRoutesRouter from './routesF/routes.js';
+import ipTracker from './utils/ipTracker.js';
+import httpLogger from './utils/httpLogger.js';
+import { setupSwagger } from './config/swagger.js';
+import { generalLimiter, authLimiter } from './middleware/rateLimiter.js';
+import { errorHandler } from './middleware/errorHandler.js';
+// dotenv.config() is now handled by src/config/index.ts
 dotenv.config()
 
+
 const app = express()
-app.use(cors())
+
+app.use(corsConfig)
 app.use(express.json())
+
+app.use(ipTracker)
+app.use(httpLogger)
+app.use(generalLimiter);
 
 // Multer setup for in-memory file storage
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-
-app.use(ipTracker)
-app.use(httpLogger)
 
 setupSwagger(app)
 
@@ -59,7 +69,7 @@ app.get('/', (req, res) => {
  *       201:
  *         description: User created successfully
  */
-app.post('/api/auth/signup', signUp)
+app.post('/api/auth/signup', authLimiter, signUp)
 
 /**
  * @swagger
@@ -82,7 +92,8 @@ app.post('/api/auth/signup', signUp)
  *       200:
  *         description: Account verified successfully, returns JWT
  */
-app.post('/api/auth/verify-otp', verifyOtp);
+app.post('/api/auth/verify-otp', authLimiter, verifyOtp);
+
 
 /**
  * @swagger
@@ -107,8 +118,8 @@ app.post('/api/auth/verify-otp', verifyOtp);
  *       401:
  *         description: Invalid email or password
  */
-app.post('/api/auth/signin', signIn)
-app.post('/api/auth/login', signIn)
+app.post('/api/auth/signin', authLimiter, signIn)
+app.post('/api/auth/login', authLimiter, signIn)
 
 /**
  * @swagger
@@ -129,7 +140,7 @@ app.post('/api/auth/login', signIn)
  *       200:
  *         description: A confirmation message is sent
  */
-app.post('/api/auth/forgot-password', forgotPassword);
+app.post('/api/auth/forgot-password', authLimiter, forgotPassword);
 
 /**
  * @swagger
@@ -154,7 +165,7 @@ app.post('/api/auth/forgot-password', forgotPassword);
  *       200:
  *         description: Password has been reset successfully
  */
-app.post('/api/auth/reset-password', resetPassword);
+app.post('/api/auth/reset-password', authLimiter, resetPassword);
 
 /**
  * @swagger
@@ -677,8 +688,79 @@ app.use('/api/cylinders', cylinderRoutes);
  */
 app.use('/api/reviews', reviewRoutes);
 
+// --- Prediction Routes ---
+/**
+ * @swagger
+ * tags:
+ *   name: Predictions
+ *   description: API for managing gas refill predictions
+ */
+
+/**
+ * @swagger
+ * /api/predictions/initial:
+ *   post:
+ *     summary: Generate the first (cold-start) prediction for a user
+ *     tags: [Predictions]
+ *     description: >
+ *       This endpoint is typically called automatically after a user registers their first cylinder
+ *       and has provided their household profile information. It generates a "cold-start" prediction
+ *       and saves it.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               cylinderId:
+ *                 type: string
+ *                 description: The ID of the user's first registered cylinder.
+ *     responses:
+ *       202:
+ *         description: Prediction generation has been accepted and is processing in the background.
+ */
+//app.use('/api/predictions', predictionRoutes);
+
+// --- Payout Routes ---
+/**
+ * @swagger
+ * tags:
+ *   name: Payouts
+ *   description: API for vendors to view their payout history
+ */
+app.use('/api/payouts', payoutRoutes);
 // --- Payment Routes (initiate, verify, wallet, webhook) ---
 app.use('/api/payments', paymentRoutes);
+
+// --- Encryption Route ---
+/**
+ * @swagger
+ * /api/encrypt:
+ *   post:
+ *     summary: Encrypt a payload for the payment gateway
+ *     tags: [Utility]
+ *     description: >
+ *       Encrypts a string payload using the payment gateway's public key.
+ *       **WARNING**: For PCI compliance, sensitive card data (PAN, CVV) should be
+ *       encrypted on the client-side, not sent to the server for encryption. This
+ *       endpoint receives the payload in plaintext.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               payload:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Payload encrypted successfully.
+ */
+app.post('/api/encrypt', encryptionController.encryptPayload);
 
 // --- Real-time Notifications (Server-Sent Events) ---
 // GET /api/notifications/stream — authenticated users subscribe to their own event stream
@@ -728,7 +810,13 @@ app.patch('/api/notifications/:id/read', authenticate, async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 4000
+// --- Developer Route Listing (must be last to see all routes) ---
+app.use('/routes', createRoutesRouter(app));
+
+// --- Global Error Handler (must be the last middleware) ---
+app.use(errorHandler);
+
+const PORT = config.port;
 
 const isDirectRun =
   !process.argv[1] ||
@@ -738,12 +826,14 @@ const isDirectRun =
 
 if (isDirectRun) {
   // Initialize background jobs
-  predictionJob.start();
+  if (config.enablePredictionJob) predictionJob.start();
+  if (config.enablePayoutJob) payoutJob.start(); // Start the new payout job
 
-  app.listen(PORT, () => {
-    // eslint-disable-next-line no-console
-    console.log(`Server running on http://localhost:${PORT}`)
-  })
+  setTimeout(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`)
+    })
+  }, 0);
 }
 
 export default app

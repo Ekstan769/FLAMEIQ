@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { prisma } from '@/db/prisma.js';
 import { logger } from '@/utils/logger.js';
-import { CylinderSize } from '@prisma/client';
+import { CylinderSize } from '../generated/prisma/client.js'
+import { registerCylinderSchema } from '@/validators/cylinderValidators.js';
 
 /**
  * Get all cylinders for the authenticated user.
@@ -24,17 +25,11 @@ export const getCylinders = async (req: Request, res: Response) => {
  */
 export const registerCylinder = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const { size, serialNumber, nickname } = req.body;
-
-  if (!size) {
-    return res.status(400).json({ success: false, message: 'Cylinder size is required.' });
+  const result = registerCylinderSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ success: false, error: result.error.flatten().fieldErrors });
   }
-
-  // Basic validation for enum
-  const validSizes = Object.values(CylinderSize);
-  if (!validSizes.includes(size as CylinderSize)) {
-    return res.status(400).json({ success: false, message: `Invalid cylinder size. Valid sizes are: ${validSizes.join(', ')}` });
-  }
+  const { size, serialNumber, nickname } = result.data;
 
   try {
     const newCylinder = await prisma.cylinder.create({

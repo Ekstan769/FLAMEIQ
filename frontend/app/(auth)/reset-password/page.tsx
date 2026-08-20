@@ -6,7 +6,6 @@ import { Lock } from "lucide-react";
 import Input from "@/components/ui/Input";
 import AuthIconBadge from "@/components/ui/AuthIconBadge";
 import Button from "@/components/ui/Button";
-import AuthScreenHeader from "@/components/layout/AuthScreenHeader";
 import { resetPassword } from "@/services/authService";
 import SuccessModal from "@/components/modals/SuccessModal";
 
@@ -44,8 +43,6 @@ function ResetPasswordContent() {
 
   return (
     <div className="w-full max-w-sm">
-      <AuthScreenHeader />
-
       <div className="text-center">
         <AuthIconBadge>
           <Lock size={22} className="text-brand-500" />

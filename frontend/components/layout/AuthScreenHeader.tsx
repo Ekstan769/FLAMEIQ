@@ -9,10 +9,10 @@ export default function AuthScreenHeader() {
 
   return (
     <div className="mb-8 flex w-full items-center justify-between">
-      <Image src="/images/logo.svg" alt="FlameIQ" width={110} height={28} />
+      <Image src="/images/logo.png" alt="FlameIQ logo" width={140} height={34} />
       <button
         onClick={() => router.back()}
-        className="inline-flex items-center gap-1 text-sm font-medium text-muted-500 hover:text-ink-500"
+        className="inline-flex items-center gap-1 text-sm font-medium text-muted-500 hover:text-ink-500 cursor-pointer"
       >
         <ArrowLeft size={14} /> Go Back
       </button>

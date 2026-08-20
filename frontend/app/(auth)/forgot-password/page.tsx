@@ -6,7 +6,6 @@ import { Lock, Mail } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import AuthIconBadge from "@/components/ui/AuthIconBadge";
-import AuthScreenHeader from "@/components/layout/AuthScreenHeader";
 import { sendPasswordReset } from "@/services/authService";
 
 export default function ForgotPasswordPage() {
@@ -31,8 +30,6 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="w-full max-w-sm">
-      <AuthScreenHeader />
-
       <div className="text-center">
         <AuthIconBadge>
           <Lock size={22} className="text-brand-500" />
